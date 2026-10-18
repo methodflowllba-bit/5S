@@ -51,3 +51,10 @@ create policy auditorias_exclusao_definitiva on auditorias_5s for delete to auth
  and comentarios->'_lixeira'->>'excluida'='true');
 revoke all on auditorias_5s from anon;
 grant select,insert,update,delete on auditorias_5s to authenticated;
+-- Preserva a sessão única se este arquivo for aplicado depois da proteção.
+do $$ begin
+ if to_regprocedure('proj_p_3634611143.sessao_5s_ativa()') is not null then
+  execute 'drop policy if exists sessao_unica_exclusoes on proj_p_3634611143.auditorias_excluidas_5s';
+  execute 'create policy sessao_unica_exclusoes on proj_p_3634611143.auditorias_excluidas_5s as restrictive for all to authenticated using(proj_p_3634611143.sessao_5s_ativa()) with check(proj_p_3634611143.sessao_5s_ativa())';
+ end if;
+end $$;
