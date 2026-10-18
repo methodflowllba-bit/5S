@@ -2207,10 +2207,30 @@
     if (C === "auditorias") return Ge();
     Oa();
   }
+  function prepareBlankLogin(form) {
+    form.setAttribute("autocomplete", "off");
+    for (const field of [form.elements.email, form.elements.password]) {
+      field.value = "";
+      field.defaultValue = "";
+      field.readOnly = true;
+      field.setAttribute("autocomplete", field.type === "password" ? "new-password" : "off");
+      let editing = false;
+      const unlock = () => {
+        if (editing) return;
+        field.value = "";
+        field.readOnly = false;
+        editing = true;
+      };
+      field.addEventListener("pointerdown", unlock);
+      field.addEventListener("focus", unlock);
+      field.addEventListener("input", () => { if (!editing) field.value = ""; });
+    }
+  }
   function Z() {
     if (V) return Ue();
     ((c("#app").innerHTML =
-      `<div class="login"><section class="loginStory">${W()}<div><p class="eyebrow">UM LUGAR PARA CADA COISA.<br>MAIS RESULTADO EM CADA ETAPA.</p><h1>Melhoria cont\xEDnua<br>come\xE7a no<br><em>dia a dia.</em></h1><p>Avalie os cinco sensos, registre evid\xEAncias<br>e transforme oportunidades em a\xE7\xF5es.</p><div class="sensos">${X.map((e, a) => `<span><b>0${a + 1}</b>${e}</span>`).join("")}</div></div><small>method-flow.com</small></section><section class="loginForm"><div><p class="eyebrow">BEM-VINDO AO PROGRAMA 5S</p><h2>${x ? "Crie seu acesso" : "Entre para continuar"}</h2><p>${x ? "Use o e-mail autorizado pelo administrador." : "Acesse suas auditorias e acompanhe a evolu\xE7\xE3o."}</p><form id="authForm"><label>E-mail<input name="email" type="email" autocomplete="email" required placeholder="voce@empresa.com"></label><label>Senha<input name="password" type="password" autocomplete="${x ? "new-password" : "current-password"}" minlength="8" required placeholder="Sua senha"></label><label class="showPassword"><span><input id="showPassword" type="checkbox"> Mostrar senha</span></label><button class="primary wide">${x ? "Criar conta" : "Entrar"} <span>\u2192</span></button><p id="authError" role="alert"></p></form><button class="textbutton" id="forgotPassword">Esqueci minha senha</button><br><button class="textbutton" id="toggleAuth">${x ? "J\xE1 tenho conta. Entrar" : "Primeiro acesso? Criar minha conta"}</button><div class="loginNote">${x ? "O cadastro n\xE3o concede permiss\xE3o para consultar auditorias. O administrador define seu acesso." : "Seu login no aplicativo \xE9 separado do login no painel do SuperDB."}</div><p class="subtle">Administrador principal: ${z}</p>${g ? '<p class="subtle">Vers\xE3o Windows \xB7 Ap\xF3s o primeiro login, suas auditorias podem ser feitas sem internet.</p>' : ""}</div></section></div>`),
+      `<div class="login"><section class="loginStory">${W()}<div><p class="eyebrow">UM LUGAR PARA CADA COISA.<br>MAIS RESULTADO EM CADA ETAPA.</p><h1>Melhoria cont\xEDnua<br>come\xE7a no<br><em>dia a dia.</em></h1><p>Avalie os cinco sensos, registre evid\xEAncias<br>e transforme oportunidades em a\xE7\xF5es.</p><div class="sensos">${X.map((e, a) => `<span><b>0${a + 1}</b>${e}</span>`).join("")}</div></div><small>method-flow.com</small></section><section class="loginForm"><div><p class="eyebrow">BEM-VINDO AO PROGRAMA 5S</p><h2>${x ? "Crie seu acesso" : "Entre para continuar"}</h2><p>${x ? "Use o e-mail autorizado pelo administrador." : "Acesse suas auditorias e acompanhe a evolu\xE7\xE3o."}</p><form id="authForm" autocomplete="off"><label>E-mail<input name="email" type="email" autocomplete="off" readonly required placeholder="voce@empresa.com"></label><label>Senha<input name="password" type="password" autocomplete="new-password" readonly minlength="8" required placeholder="Sua senha"></label><label class="showPassword"><span><input id="showPassword" type="checkbox"> Mostrar senha</span></label><button class="primary wide">${x ? "Criar conta" : "Entrar"} <span>\u2192</span></button><p id="authError" role="alert"></p></form><button class="textbutton" id="forgotPassword">Esqueci minha senha</button><br><button class="textbutton" id="toggleAuth">${x ? "J\xE1 tenho conta. Entrar" : "Primeiro acesso? Criar minha conta"}</button><div class="loginNote">${x ? "O cadastro n\xE3o concede permiss\xE3o para consultar auditorias. O administrador define seu acesso." : "Seu login no aplicativo \xE9 separado do login no painel do SuperDB."}</div><p class="subtle">Administrador principal: ${z}</p>${g ? '<p class="subtle">Vers\xE3o Windows \xB7 Ap\xF3s o primeiro login, suas auditorias podem ser feitas sem internet.</p>' : ""}</div></section></div>`),
+      prepareBlankLogin(c("#authForm")),
       (c("#forgotPassword").onclick = Ta),
       (c("#showPassword").onchange = (e) => {
         c("#authForm").elements.password.type = e.target.checked
@@ -2229,6 +2249,7 @@
           (c("#authError").textContent =
             "Aguarde a confirma\xE7\xE3o do acesso."));
         try {
+          if (!e.target.elements.email.value.trim() || !e.target.elements.password.value) throw Error("Informe seu e-mail e sua senha para entrar.");
           let o = new FormData(e.target),
             r = await b.auth[x ? "signUp" : "signInWithPassword"]({
               email: String(o.get("email")).trim().toLowerCase(),
