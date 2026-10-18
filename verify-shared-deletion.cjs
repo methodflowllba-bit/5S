@@ -13,7 +13,7 @@ const deleted = {...base, comentarios:{_lixeira:{excluida:true,em:'2026-10-18T16
     ctx.$ = x => x.comentarios?._lixeira?.excluida === true;
     ctx.M = () => ctx.local; ctx.ce = x => ctx.local = x;
     ctx.b = {from:()=>({select:()=>({order:async()=>({data:[structuredClone(deleted)]})})})};
-    vm.createContext(ctx); vm.runInContext(extract('ke') + extract('ue'), ctx);
+    ctx.ensurePortalSession=async()=>true;vm.createContext(ctx); vm.runInContext(extract('ke') + extract('ue'), ctx);
     await ctx.ue(false);
     assert.equal(ctx.local[0].comentarios._lixeira.excluida,true);
     assert.equal(ctx.local[0].respostas.foto,'preservada');
@@ -29,7 +29,7 @@ const deleted = {...base, comentarios:{_lixeira:{excluida:true,em:'2026-10-18T16
     assert.equal(ctx.ke(ctx.ne,ctx.local).length,0);
   }
   const ctx={p:{user:{id:'user'}},D:false,R:false,navigator:{onLine:true},document:{visibilityState:'visible'},M:()=>[],w(){this.renders++},renders:0};
-  ctx.ue=async()=>{ctx.reads=(ctx.reads||0)+1};vm.createContext(ctx);
+  ctx.ensurePortalSession=async()=>true;ctx.ue=async()=>{ctx.reads=(ctx.reads||0)+1};vm.createContext(ctx);
   vm.runInContext('let refreshingSharedAudits=false;'+extract('refreshSharedAudits'),ctx);
   await Promise.all([ctx.refreshSharedAudits(),ctx.refreshSharedAudits()]);assert.equal(ctx.reads,1);
   ctx.navigator.onLine=false;await ctx.refreshSharedAudits();assert.equal(ctx.reads,1);
