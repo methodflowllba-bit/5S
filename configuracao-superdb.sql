@@ -52,10 +52,14 @@ create policy auditorias_leitura on auditorias_5s for select to authenticated us
 drop policy if exists auditorias_insercao on auditorias_5s;
 create policy auditorias_insercao on auditorias_5s for insert to authenticated with check(proj_p_3634611143.membro_5s() and user_id=auth.uid());
 drop policy if exists auditorias_atualizacao on auditorias_5s;
-create policy auditorias_atualizacao on auditorias_5s for update to authenticated using(proj_p_3634611143.membro_5s() and user_id=auth.uid()) with check(proj_p_3634611143.membro_5s() and user_id=auth.uid());
+create policy auditorias_atualizacao on auditorias_5s for update to authenticated
+ using(proj_p_3634611143.membro_5s() and (user_id=auth.uid() or proj_p_3634611143.admin_5s()))
+ with check(proj_p_3634611143.membro_5s() and (user_id=auth.uid() or proj_p_3634611143.admin_5s()));
 revoke all on auditorias_5s from anon;
 grant select,insert,update on auditorias_5s to authenticated;
 create index if not exists auditorias_5s_usuario_idx on auditorias_5s(user_id);
 create index if not exists auditorias_5s_data_idx on auditorias_5s(data_auditoria);
 -- Evidências ficam no registro JSON da resposta (JPEG reduzido), protegidas pela mesma RLS.
--- Não há exclusão definitiva no app. Desative membros para revogar acesso ao portal.
+-- Administradores podem editar e mover qualquer auditoria para a Lixeira.
+-- Auditores só gerenciam suas próprias auditorias. Não há exclusão definitiva.
+
