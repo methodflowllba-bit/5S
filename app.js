@@ -1770,6 +1770,26 @@
       ],
     },
   ];
+  function createWebAuthStorage() {
+    // Memory belongs to this document only: no localStorage/sessionStorage
+    // restore, including duplicated tabs and restored browser sessions.
+    const values = new Map();
+    try {
+      localStorage.removeItem("superdb.auth.session");
+      localStorage.removeItem("superdb.auth.pkce");
+      const oldTerminalKeys = [];
+      for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key?.startsWith("programa5s:terminal:")) oldTerminalKeys.push(key);
+      }
+      oldTerminalKeys.forEach((key) => localStorage.removeItem(key));
+    } catch {}
+    return {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: (key) => values.delete(key),
+    };
+  }
   var g = window.programa5sDesktop,
     De = g
       ? {
@@ -1777,11 +1797,11 @@
           setItem: (e, a) => g.write("auth:" + e, a),
           removeItem: (e) => g.remove("auth:" + e),
         }
-      : void 0,
+      : createWebAuthStorage(),
     b = Ne(_.url, _.key, {
       project: _.project,
       fetch: Oe,
-      ...(De ? { storage: De } : {}),
+      storage: De,
     }),
     z = "alvaro.batistella@method-flow.com",
     X = ["SEIRI", "SEITON", "SEISO", "SEIKETSU", "SHITSUKE"],
@@ -1811,7 +1831,8 @@
         window.location.pathname + window.location.search,
       ));
   } catch {}
-  var portalTerminalToken = "",
+  var webPageLoginVerified = false,
+    portalTerminalToken = "",
     portalProtectionEnabled = false,
     p = null,
     T = null,
@@ -1866,18 +1887,19 @@
   function terminalStorageKey() { return `programa5s:terminal:${p.user.id}`; }
   function readPortalTerminal() {
     const key = terminalStorageKey();
-    try { return (g ? g.read(key) : localStorage.getItem(key)) || ""; } catch { return ""; }
+    try { return (g ? g.read(key) : "") || ""; } catch { return ""; }
   }
   function savePortalTerminal(token) {
     const key = terminalStorageKey();
     if (g) { token ? g.write(key, token) : g.remove(key); }
-    else { token ? localStorage.setItem(key, token) : localStorage.removeItem(key); }
+    // The web terminal identifier lives only in portalTerminalToken for this page.
   }
   async function closeReplacedSession() {
     if (d) { try { S(); } catch {} }
     if (p) savePortalTerminal("");
     g && g.remove("perfil-offline");
     portalTerminalToken = "";
+    webPageLoginVerified = false;
     p = null; T = null; d = null; ne = []; D = false;
     w();
     const message = "Esta conta entrou em outro terminal ou seu acesso foi desativado. Entre novamente para continuar. Os rascunhos deste aparelho foram preservados.";
@@ -2214,7 +2236,7 @@
             });
           if (r.error) throw r.error;
           r.data?.session
-            ? ((p = r.data.session), await Ee(true))
+            ? ((webPageLoginVerified = true), (p = r.data.session), await Ee(true))
             : h("Cadastro recebido. Confira seu e-mail antes de entrar.");
         } catch (o) {
           c("#authError") && (c("#authError").textContent = oe(o));
@@ -3218,6 +3240,16 @@
   window.addEventListener("beforeinstallprompt", (e) => {
     (e.preventDefault(), (ie = e));
   });
+  function requireFreshWebLogin(event) {
+    if (g || !event.persisted) return;
+    if (d) { try { S(); } catch {} }
+    webPageLoginVerified = false;
+    p = null; T = null; d = null; ne = []; ye = [];
+    w();
+    // Back/forward cache can restore JavaScript memory. Start a fresh document.
+    window.location.reload();
+  }
+  window.addEventListener("pageshow", requireFreshWebLogin);
   window.addEventListener("online", () => {
     p && w();
     refreshSharedAudits();
@@ -3239,13 +3271,22 @@
         } catch {}
       if (g && D) return;
       portalTerminalToken = "";
+      webPageLoginVerified = false;
+      ne = []; ye = []; selectedTrashAudits.clear();
       ((p = null), (T = null), (d = null), w());
-    } else a && (p = a);
+    } else a && (g || webPageLoginVerified) && (p = a);
   });
   (async () => {
     try {
       if (V) {
         Ue();
+        return;
+      }
+      if (!g) {
+        // Every new web document starts on the login screen, regardless of
+        // any other tab, browser profile restore, or formerly saved session.
+        p = null; T = null;
+        w();
         return;
       }
       if (g) {
