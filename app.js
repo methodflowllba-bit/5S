@@ -1857,6 +1857,77 @@
   function canManageAudit(record) {
     return Boolean(p?.user && record && (T === "administrador" || record.user_id === p.user.id));
   }
+  const selectedTrashAudits = new Set();
+  function bindTrashSelection() {
+    if (!J) return;
+    document.querySelectorAll('[data-trash][data-deleted="false"]').forEach((restore) => {
+      const row = I(true).find((item) => item.id === restore.dataset.trash);
+      if (!row || !$(row) || !canManageAudit(row)) return;
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.dataset.purgeSelect = row.id;
+      input.setAttribute("aria-label", `Selecionar auditoria ${row.area} de ${row.data_auditoria}`);
+      input.style.cssText = "width:auto;margin-right:12px;vertical-align:middle";
+      restore.closest("tr").querySelector("td").prepend(input);
+    });
+    if (!c("#purgeSelected") && c("#syncTrash")) {
+      const button = document.createElement("button");
+      button.id = "purgeSelected";
+      button.className = "ghost danger";
+      c("#syncTrash").before(button);
+    }
+    document.querySelectorAll("[data-purge-select]").forEach((input) => {
+      input.checked = selectedTrashAudits.has(input.dataset.purgeSelect);
+      input.onchange = () => {
+        input.checked ? selectedTrashAudits.add(input.dataset.purgeSelect) : selectedTrashAudits.delete(input.dataset.purgeSelect);
+        updatePurgeButton();
+      };
+    });
+    updatePurgeButton();
+  }
+  function updatePurgeButton() {
+    const button = c("#purgeSelected");
+    if (!button) return;
+    const count = I(true).filter((row) => $(row) && selectedTrashAudits.has(row.id)).length;
+    button.disabled = !count || R;
+    button.textContent = `Excluir definitivamente (${count})`;
+    button.onclick = purgeSelectedAudits;
+  }
+  async function purgeSelectedAudits() {
+    if (R) return h("Aguarde o envio terminar.");
+    if (!navigator.onLine || D) return h("Conecte-se ao portal para excluir definitivamente.");
+    const rows = I(true).filter((row) => $(row) && selectedTrashAudits.has(row.id) && canManageAudit(row));
+    if (!rows.length) return h("Selecione uma auditoria na Lixeira.");
+    if (rows.some((row) => row._trashPending)) return h("Primeiro clique em Enviar exclusões / restaurações para confirmar a Lixeira no portal.");
+    if (!confirm(`Excluir definitivamente ${rows.length} auditoria(s)?\n${rows.map((row) => `${row.area} — ${row.data_auditoria}`).join("\n")}\n\nAs notas, fotos e planos de ação serão apagados do portal para todos os acessos. Não será possível restaurar pela Lixeira.`)) return;
+    const account = p.user.id;
+    R = true;
+    const blocker = document.createElement("div");
+    blocker.className = "syncBlocker";
+    blocker.textContent = "Excluindo definitivamente…";
+    document.body.append(blocker);
+    let removed = 0;
+    try {
+      const auth = await b.auth.getUser();
+      if (auth.error) throw auth.error;
+      if (auth.data.user?.id !== account) throw Error("Entre novamente com o mesmo usuário.");
+      for (const row of rows) {
+        const result = await b.from("auditorias_5s").delete().eq("id", row.id).eq("user_id", row.user_id).select("id");
+        if (result.error) throw result.error;
+        if (!result.data?.some((item) => item.id === row.id)) throw Error("O portal não confirmou a exclusão. Execute o SQL Exclusao_Definitiva_5S.sql e atualize a Lixeira antes de tentar novamente.");
+        if (p?.user?.id !== account) throw Error("A conta foi alterada. Atualize o portal.");
+        ce(M().filter((item) => item.id !== row.id));
+        ne = ne.filter((item) => item.id !== row.id);
+        selectedTrashAudits.delete(row.id);
+        removed++;
+      }
+      h(`${removed} auditoria(s) excluída(s) definitivamente.`);
+    } catch (error) {
+      h(`${removed ? `${removed} auditoria(s) apagada(s). ` : ""}Não foi possível concluir: ${error.message}`);
+    } finally {
+      blocker.remove(); R = false; w();
+    }
+  }
   function ze(e) {
     let a = M(),
       t = a.findIndex((o) => o.id === e.id);
@@ -2205,8 +2276,16 @@
       .select("*")
       .order("data_auditoria", { ascending: !1 });
     if (a.error) throw a.error;
+    // A minimal deletion ledger invalidates stale copies on every device.
+    const purged = await b.from("auditorias_excluidas_5s").select("id");
     if (!account || p?.user?.id !== account) return;
-    ne = a.data || [];
+    const removedIds = new Set(purged.error ? [] : (purged.data || []).map((row) => row.id));
+    if (removedIds.size) {
+      ce(M().filter((row) => !removedIds.has(row.id)));
+      if (d && removedIds.has(d.id)) { d = null; w(); h("Esta auditoria foi excluída definitivamente no portal."); }
+      removedIds.forEach((id) => selectedTrashAudits.delete(id));
+    }
+    ne = (a.data || []).filter((row) => !removedIds.has(row.id));
     // Persist the server's deletion/restoration marker in this device's cache.
     // Keep a newer offline request until it has been acknowledged by the server.
     const remote = new Map(ne.map((row) => [row.id, row]));
@@ -2319,6 +2398,7 @@
             (e.onclick = () =>
               xa(e.dataset.trash, e.dataset.deleted === "true")),
         ));
+    bindTrashSelection();
   }
   function Ge() {
     let e = J ? I(!0).filter($) : I();
