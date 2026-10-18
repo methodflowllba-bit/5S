@@ -3046,6 +3046,15 @@
       button.title = entry.ativo ? `Reenviar acesso para ${entry.email}` : "Reative o usuário antes de reenviar o acesso";
       button.onclick = () => showResendAccess(entry);
       cell.append(button);
+      if (entry.email !== z) {
+        const remove = document.createElement("button");
+        remove.className = "ghost danger";
+        remove.textContent = "Excluir acesso";
+        remove.disabled = entry.email === p.user.email?.toLowerCase();
+        remove.title = remove.disabled ? "Você não pode excluir o próprio acesso" : `Excluir autorização de ${entry.email}`;
+        remove.onclick = () => deleteMemberAccess(entry.id, remove);
+        cell.append(remove);
+      }
     });
     const note = document.createElement("p");
     note.className = "muted";
@@ -3092,6 +3101,30 @@
     };
     document.body.append(dialog);
     dialog.showModal();
+  }
+  async function deleteMemberAccess(id, button) {
+    if (T !== "administrador" || R) return;
+    const entry = ye.find((row) => row.id === id);
+    if (!entry) return h("Atualize a lista de usuários antes de excluir.");
+    if (entry.email === z || entry.email === p.user.email?.toLowerCase()) return h("O administrador principal e o seu próprio acesso estão protegidos.");
+    if (!navigator.onLine || D) return h("Conecte-se ao portal para excluir um acesso.");
+    if (!confirm(`Excluir o acesso de ${entry.nome} (${entry.email})?\n\nA pessoa perderá a autorização para usar o portal. As auditorias realizadas serão preservadas. Para liberar novamente, será necessário autorizar o e-mail outra vez.`)) return;
+    R = true;
+    if (button) button.disabled = true;
+    try {
+      if (!(await ensurePortalSession())) return;
+      const result = await b.from("membros_5s").delete().eq("id", entry.id).eq("email", entry.email).select("id");
+      if (result.error) throw result.error;
+      if (!result.data?.some((row) => row.id === entry.id)) throw Error("Exclusão não confirmada. Execute Excluir_Acessos_5S.sql no Editor SQL do SuperDB e atualize a lista.");
+      ye = ye.filter((row) => row.id !== entry.id);
+      await $e();
+      h("Acesso excluído. As auditorias realizadas foram preservadas.");
+    } catch (error) {
+      h(`Não foi possível excluir o acesso: ${error.message}. Verifique a permissão do arquivo Excluir_Acessos_5S.sql.`);
+    } finally {
+      R = false;
+      if (button) button.disabled = false;
+    }
   }
   async function Re(e, a) {
     if (T !== "administrador" || !(await ensurePortalSession())) return;
