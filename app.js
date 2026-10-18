@@ -48,6 +48,10 @@
     return o;
   }
   async function Oe(e, a = {}) {
+    const headers = new Headers(a.headers || {});
+    const requestUrl = new URL(typeof e === "string" ? e : e.url);
+    if (requestUrl.origin === "https://api.superdb.com.br" && portalTerminalToken) headers.set("x-programa5s-terminal", portalTerminalToken);
+    a = { ...a, headers };
     let t = new AbortController(),
       o = setTimeout(() => t.abort(), 2e4),
       r = () => t.abort();
@@ -1807,7 +1811,9 @@
         window.location.pathname + window.location.search,
       ));
   } catch {}
-  var p = null,
+  var portalTerminalToken = "",
+    portalProtectionEnabled = false,
+    p = null,
     T = null,
     C = "inicio",
     d = null,
@@ -1856,6 +1862,52 @@
   }
   function canManageAudit(record) {
     return Boolean(p?.user && record && (T === "administrador" || record.user_id === p.user.id));
+  }
+  function terminalStorageKey() { return `programa5s:terminal:${p.user.id}`; }
+  function readPortalTerminal() {
+    const key = terminalStorageKey();
+    try { return (g ? g.read(key) : localStorage.getItem(key)) || ""; } catch { return ""; }
+  }
+  function savePortalTerminal(token) {
+    const key = terminalStorageKey();
+    if (g) { token ? g.write(key, token) : g.remove(key); }
+    else { token ? localStorage.setItem(key, token) : localStorage.removeItem(key); }
+  }
+  async function closeReplacedSession() {
+    if (d) { try { S(); } catch {} }
+    if (p) savePortalTerminal("");
+    g && g.remove("perfil-offline");
+    portalTerminalToken = "";
+    p = null; T = null; d = null; ne = []; D = false;
+    w();
+    const message = "Esta conta entrou em outro terminal ou seu acesso foi desativado. Entre novamente para continuar. Os rascunhos deste aparelho foram preservados.";
+    if (c("#authError")) c("#authError").textContent = message;
+    await b.auth.signOut();
+    if (c("#authError")) c("#authError").textContent = message;
+  }
+  async function ensurePortalSession(claim = false) {
+    if (!p?.user || !navigator.onLine) return false;
+    const account = p.user.id;
+    if (!portalTerminalToken) portalTerminalToken = readPortalTerminal();
+    if (!portalTerminalToken) { portalTerminalToken = crypto.randomUUID(); savePortalTerminal(portalTerminalToken); claim = true; }
+    const result = claim
+      ? await b.rpc("iniciar_sessao_5s", { novo_terminal: portalTerminalToken })
+      : await b.rpc("sessao_5s_ativa");
+    if (p?.user?.id !== account) return false;
+    if (result.error) {
+      if (!portalProtectionEnabled && ["PGRST202", "42883"].includes(result.error.code)) return true;
+      throw result.error;
+    }
+    portalProtectionEnabled = true;
+    if (result.data !== true) { await closeReplacedSession(); return false; }
+    return true;
+  }
+  async function releasePortalSession() {
+    if (p && portalTerminalToken && navigator.onLine) {
+      try { await b.rpc("encerrar_sessao_5s"); } catch {}
+    }
+    if (p) savePortalTerminal("");
+    portalTerminalToken = "";
   }
   const selectedTrashAudits = new Set();
   function bindTrashSelection() {
@@ -1908,6 +1960,7 @@
     document.body.append(blocker);
     let removed = 0;
     try {
+      if (!(await ensurePortalSession())) return;
       const auth = await b.auth.getUser();
       if (auth.error) throw auth.error;
       if (auth.data.user?.id !== account) throw Error("Entre novamente com o mesmo usuário.");
@@ -1978,6 +2031,7 @@
       (o.textContent = "Atualizando a Lixeira no SuperDB\u2026"),
       document.body.append(o));
     try {
+      if (!(await ensurePortalSession())) return;
       let r = await b.auth.getUser();
       if (r.error) throw r.error;
       if (r.data.user?.id !== a)
@@ -2101,6 +2155,7 @@
       ),
       (c("#logout").onclick = async () => {
         try {
+          await releasePortalSession();
           let e = await b.auth.signOut();
           if (e.error) throw e.error;
           (g && g.remove("perfil-offline"),
@@ -2159,7 +2214,7 @@
             });
           if (r.error) throw r.error;
           r.data?.session
-            ? ((p = r.data.session), await Ee())
+            ? ((p = r.data.session), await Ee(true))
             : h("Cadastro recebido. Confira seu e-mail antes de entrar.");
         } catch (o) {
           c("#authError") && (c("#authError").textContent = oe(o));
@@ -2233,8 +2288,9 @@
         }
       }));
   }
-  async function Ee() {
+  async function Ee(claim = false) {
     try {
+      if (!(await ensurePortalSession(claim === true))) return;
       if (((T = null), p.user.email?.toLowerCase() === z)) T = "administrador";
       else {
         let e = await b
@@ -2267,6 +2323,7 @@
   }
   async function ue(e = !0) {
     const account = p?.user?.id;
+    if (!(await ensurePortalSession())) return;
     if (D && e)
       return h(
         "Abra uma auditoria e use Enviar ao SuperDB para validar sua conex\xE3o e sess\xE3o.",
@@ -2305,10 +2362,18 @@
   }
   let refreshingSharedAudits = false;
   async function refreshSharedAudits() {
-    if (!p || D || R || refreshingSharedAudits || !navigator.onLine || document.visibilityState === "hidden") return;
+    if (!p || R || refreshingSharedAudits || !navigator.onLine || document.visibilityState === "hidden") return;
     refreshingSharedAudits = true;
     const account = p.user.id;
     try {
+      if (D) {
+        const session = (await b.auth.getSession()).data.session;
+        if (!session) return;
+        p = session;
+        await Ee(false);
+        return;
+      }
+      if (!(await ensurePortalSession())) return;
       if (M().some((row) => row._trashPending && canManageAudit(row))) await Me();
       if (p?.user?.id !== account) return;
       await ue(false);
@@ -2810,6 +2875,7 @@
       document.body.append(e),
       (c("#sync").disabled = !0));
     try {
+      if (!(await ensurePortalSession())) return;
       if ((S(), g)) {
         if (!(await b.auth.getSession()).data.session)
           throw Error(
@@ -2902,6 +2968,7 @@
       ));
   }
   async function $e() {
+    if (T !== "administrador" || !(await ensurePortalSession())) return;
     ((c("#content").innerHTML =
       Y(
         "ADMINISTRA\xC7\xC3O",
@@ -2929,6 +2996,7 @@
           )
         )
           try {
+            if (!(await ensurePortalSession())) return;
             let o = await b
               .from("membros_5s")
               .upsert(t, { onConflict: "email" })
@@ -2956,6 +3024,7 @@
         document
           .querySelectorAll("[data-role]")
           .forEach((a) => (a.onclick = () => Re(a.dataset.role, "perfil"))));
+      bindResendAccess();
     } catch (e) {
       (c("#memberList") &&
         (c("#memberList").textContent =
@@ -2963,7 +3032,69 @@
         v(e));
     }
   }
+  function bindResendAccess() {
+    if (T !== "administrador") return;
+    const entries = [{ email: z, nome: "Álvaro Batistella", ativo: true }, ...ye.filter((row) => row.email !== z)];
+    const rows = [...document.querySelectorAll("#memberList tbody tr")];
+    entries.forEach((entry, index) => {
+      const cell = rows[index]?.querySelector("td:last-child");
+      if (!cell) return;
+      const button = document.createElement("button");
+      button.className = "ghost";
+      button.textContent = "Reenviar acesso";
+      button.disabled = !entry.ativo;
+      button.title = entry.ativo ? `Reenviar acesso para ${entry.email}` : "Reative o usuário antes de reenviar o acesso";
+      button.onclick = () => showResendAccess(entry);
+      cell.append(button);
+    });
+    const note = document.createElement("p");
+    note.className = "muted";
+    note.textContent = portalProtectionEnabled
+      ? "Proteção ativa: uma sessão por conta. Entrar em outro terminal encerra o acesso anterior."
+      : "Proteção de sessão ainda não ativada no banco. Execute Sessao_Unica_5S.sql no Editor SQL do SuperDB.";
+    if (!portalProtectionEnabled) {
+      const link = document.createElement("a");
+      link.href = "./Sessao_Unica_5S.sql";
+      link.download = "Sessao_Unica_5S.sql";
+      link.textContent = " Baixar SQL da proteção";
+      note.append(link);
+    }
+    c("#memberList")?.append(note);
+  }
+  function showResendAccess(entry) {
+    if (T !== "administrador" || !entry.ativo) return;
+    const dialog = document.createElement("dialog");
+    dialog.className = "cameraDialog";
+    dialog.setAttribute("aria-label", "Reenviar acesso");
+    const portal = "https://methodflowllba-bit.github.io/5S/";
+    dialog.innerHTML = `<div class="cameraHead"><h2>Reenviar acesso</h2><button class="ghost" data-close aria-label="Fechar">×</button></div><p><b>${m(entry.nome)}</b><br>${m(entry.email)}</p><p>Para uma conta já cadastrada, envie um e-mail com o link para definir uma nova senha. Confira também a pasta de spam.</p><button class="primary" data-send-access>Enviar e-mail de acesso</button><p data-access-message role="status"></p><hr><h3>Primeiro acesso</h3><p>Se a pessoa ainda não criou a conta, compartilhe este endereço. Ela deve escolher “Criar minha conta” com o e-mail autorizado.</p><a href="${portal}" target="_blank" rel="noopener">${portal}</a><p><button class="ghost" data-copy-access>Copiar link do portal</button></p>`;
+    const close = () => { dialog.close(); dialog.remove(); };
+    dialog.querySelector("[data-close]").onclick = close;
+    dialog.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
+    const message = dialog.querySelector("[data-access-message]");
+    dialog.querySelector("[data-copy-access]").onclick = async () => {
+      try { await navigator.clipboard.writeText(portal); message.textContent = "Link copiado. Compartilhe com o usuário."; }
+      catch { message.textContent = "Copie o endereço do portal exibido abaixo."; }
+    };
+    dialog.querySelector("[data-send-access]").onclick = async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      message.textContent = "Solicitando e-mail ao SuperDB…";
+      try {
+        if (!(await ensurePortalSession())) return;
+        const current = entry.email === z ? { ativo: true } : ye.find((row) => row.email === entry.email);
+        if (T !== "administrador" || !current?.ativo) throw Error("Reative o acesso deste usuário antes de enviar.");
+        const result = await b.auth.resetPasswordForEmail(entry.email, { redirectTo: portal });
+        if (result.error) throw result.error;
+        message.textContent = "Solicitação aceita pelo SuperDB. Se este e-mail já tem uma conta cadastrada, receberá o link para definir uma nova senha. O envio depende da configuração de e-mail do projeto.";
+      } catch (error) { message.textContent = oe(error); }
+      finally { button.disabled = false; }
+    };
+    document.body.append(dialog);
+    dialog.showModal();
+  }
   async function Re(e, a) {
+    if (T !== "administrador" || !(await ensurePortalSession())) return;
     let t = ye.find((r) => r.id === e),
       o =
         a === "ativo"
@@ -3074,6 +3205,7 @@
           S();
         } catch {}
       if (g && D) return;
+      portalTerminalToken = "";
       ((p = null), (T = null), (d = null), w());
     } else a && (p = a);
   });
