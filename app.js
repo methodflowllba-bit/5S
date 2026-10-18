@@ -82,6 +82,9 @@
     return /already.*(registered|exists)|user_already_exists|email_exists|e-?mail.*j[aá].*(cadastrad|registrad)|usu[aá]rio.*j[aá].*existe/i.test(`${error?.code || ""} ${error?.message || ""}`);
   }
   function oe(e) {
+    const code = `${e?.code || ""} ${e?.message || ""}`;
+    if (/invalid_otp/.test(code)) return "Código incorreto, vencido ou já utilizado";
+    if (/rate_limited/.test(code)) return "Limite de tentativas atingido. Aguarde antes de tentar novamente";
     if (isExistingAccountError(e)) return "Este e-mail já possui uma conta. Use Criar nova senha. Se o acesso foi excluído, o administrador precisa autorizar o mesmo e-mail novamente.";
     let a = e?.message || "N\xE3o foi poss\xEDvel entrar. Tente novamente.";
     return /invalid.*(credential|password)|incorrect.*password|invalid login|credenciais.*inválid/i.test(
@@ -2232,6 +2235,7 @@
   }
   function Z() {
     if (V) return Ue();
+    if (x) return emailCodeAccess("", true);
     ((c("#app").innerHTML =
       `<div class="login"><section class="loginStory">${W()}<div><p class="eyebrow">UM LUGAR PARA CADA COISA.<br>MAIS RESULTADO EM CADA ETAPA.</p><h1>Melhoria cont\xEDnua<br>come\xE7a no<br><em>dia a dia.</em></h1><p>Avalie os cinco sensos, registre evid\xEAncias<br>e transforme oportunidades em a\xE7\xF5es.</p><div class="sensos">${X.map((e, a) => `<span><b>0${a + 1}</b>${e}</span>`).join("")}</div></div><small>method-flow.com</small></section><section class="loginForm"><div><p class="eyebrow">BEM-VINDO AO PROGRAMA 5S</p><h2>${x ? "Criar novo acesso" : "Entre para continuar"}</h2><p>${x ? "Use o e-mail autorizado pelo administrador." : "Acesse suas auditorias e acompanhe a evolu\xE7\xE3o."}</p><form id="authForm" autocomplete="off"><label>E-mail<input name="email" type="email" autocomplete="off" readonly required placeholder="voce@empresa.com"></label><label>Senha<input name="password" type="password" autocomplete="new-password" readonly minlength="8" required placeholder="Sua senha"></label><label class="showPassword"><span><input id="showPassword" type="checkbox"> Mostrar senha</span></label><button class="primary wide">${x ? "Criar conta" : "Entrar"} <span>\u2192</span></button><p id="authError" role="alert"></p></form><button class="textbutton" id="forgotPassword">Criar nova senha / Esqueci minha senha</button><br><button class="textbutton" id="toggleAuth">${x ? "J\xE1 tenho conta. Entrar" : "Criar novo acesso"}</button><div class="loginNote">${x ? "O cadastro n\xE3o concede permiss\xE3o para consultar auditorias. O administrador define seu acesso." : "Seu login no aplicativo \xE9 separado do login no painel do SuperDB."}</div><p class="subtle">Administrador principal: ${z}</p>${g ? '<p class="subtle">Vers\xE3o Windows \xB7 Ap\xF3s o primeiro login, suas auditorias podem ser feitas sem internet.</p>' : ""}</div></section></div>`),
       prepareBlankLogin(c("#authForm")),
@@ -2255,28 +2259,79 @@
         try {
           if (!e.target.elements.email.value.trim() || !e.target.elements.password.value) throw Error("Informe seu e-mail e sua senha para entrar.");
           let o = new FormData(e.target),
-            r = await b.auth[x ? "signUp" : "signInWithPassword"]({
+            r = await b.auth.signInWithPassword({
               email: String(o.get("email")).trim().toLowerCase(),
               password: o.get("password"),
             });
           if (r.error) throw r.error;
           r.data?.session
             ? ((webPageLoginVerified = true), (p = r.data.session), await Ee(true))
-            : h("Cadastro recebido. Confira seu e-mail antes de entrar.");
+            : h("O SuperDB não confirmou a sessão. Tente entrar novamente.");
         } catch (o) {
           c("#authError") && (c("#authError").textContent = oe(o));
-          if (x && isExistingAccountError(o)) {
-            const action = document.createElement("button");
-            action.type = "button";
-            action.className = "ghost";
-            action.textContent = "Criar nova senha para este e-mail";
-            action.onclick = () => Ta(e.target.elements.email.value);
-            c("#authError")?.append(action);
-          }
         } finally {
           ((a.disabled = !1), (a.innerHTML = t));
         }
       }));
+    const codeButton = document.createElement("button");
+    codeButton.className = "textbutton";
+    codeButton.textContent = "Entrar com código recebido por e-mail";
+    codeButton.onclick = () => emailCodeAccess(c("#authForm")?.elements.email.value || "");
+    c("#authForm").after(codeButton);
+  }
+  function emailCodeAccess(email = "", firstAccess = false) {
+    let target = "", busy = false, generation = 0;
+    c("#app").innerHTML = `<section class="loginForm"><div>${W()}<h2>${firstAccess ? "Confirmar novo acesso" : "Entrar com código"}</h2><p>Confirme que recebe mensagens no e-mail autorizado pelo administrador. O acesso só será concluído após validar o código. A autorização do administrador continua necessária.</p><form id="emailCodeForm"><label>E-mail<input name="email" type="email" autocomplete="email" required value="${m(email)}"></label><button class="primary wide">Solicitar código por e-mail</button></form><form id="verifyEmailForm" hidden><p>Código de seis dígitos, válido por 10 minutos.</p><label>Código recebido<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label><button class="primary wide">Confirmar recebimento e entrar</button></form><p id="emailCodeMessage" role="status"></p><button id="backCodeLogin" class="textbutton">Voltar para entrar com senha</button></div></section>`;
+    const request = c("#emailCodeForm"), verify = c("#verifyEmailForm"), message = c("#emailCodeMessage");
+    const receivedButton = document.createElement("button");
+    receivedButton.type = "button"; receivedButton.className = "textbutton"; receivedButton.textContent = "Já recebi um código";
+    receivedButton.onclick = () => {
+      if (busy || !request.reportValidity()) return;
+      target = request.elements.email.value.trim().toLowerCase();
+      verify.hidden = false;
+      message.textContent = `Aguardando confirmação para ${target}. Digite o código recebido.`;
+      verify.elements.code.focus();
+    };
+    request.after(receivedButton);
+    c("#backCodeLogin").onclick = () => { if (busy) return; generation++; x = false; Z(); };
+    request.elements.email.oninput = () => { generation++; target = ""; verify.hidden = true; verify.reset(); message.textContent = "Solicite um código para o e-mail informado."; };
+    request.onsubmit = async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      const candidate = request.elements.email.value.trim().toLowerCase(), ticket = ++generation;
+      if (!candidate) return;
+      busy = true; target = ""; verify.hidden = true; verify.reset();
+      request.querySelector("button").disabled = true;
+      message.textContent = "Solicitando código ao SuperDB…";
+      try {
+        const result = await b.auth.signInWithOtp({ email: candidate, options: { channel: "email" } });
+        if (ticket !== generation) return;
+        if (result.error) throw result.error;
+        target = candidate; verify.hidden = false;
+        request.querySelector("button").textContent = "Solicitar outro código";
+        message.textContent = `Solicitação aceita para ${target}. Recebimento ainda não confirmado. Digite o código que chegar por e-mail. Se não chegar, confira o endereço ou solicite outro código; há limite de tentativas.`;
+        verify.elements.code.focus();
+      } catch (error) { if (ticket === generation) message.textContent = oe(error); }
+      finally { busy = false; request.querySelector("button").disabled = false; }
+    };
+    verify.onsubmit = async (event) => {
+      event.preventDefault();
+      if (busy || !target) return;
+      const code = verify.elements.code.value.trim();
+      if (!/^\d{6}$/.test(code)) { message.textContent = "Informe os seis dígitos do código recebido."; return; }
+      busy = true; verify.querySelector("button").disabled = true; request.querySelector("button").disabled = true; request.elements.email.readOnly = true;
+      message.textContent = "Validando o código recebido…";
+      try {
+        const result = await b.auth.verifyOtp({ email: target, code });
+        if (result.error) throw result.error;
+        if (!result.data?.session || result.data.session.user?.email?.toLowerCase() !== target) throw Error("O SuperDB não confirmou a sessão deste e-mail.");
+        webPageLoginVerified = true; p = result.data.session;
+        h("Recebimento do e-mail confirmado pelo código válido.");
+        x = false;
+        await Ee(true);
+      } catch (error) { message.textContent = `Não foi possível confirmar: ${oe(error)}. Confira o código ou solicite outro.`; }
+      finally { busy = false; verify.querySelector("button").disabled = false; request.querySelector("button").disabled = false; request.elements.email.readOnly = false; }
+    };
   }
   function Ta(email = "") {
     let e = typeof email === "string" && email ? email : c("#authForm")?.elements?.email?.value || "";
@@ -2300,13 +2355,18 @@
             s = await b.auth.resetPasswordForEmail(o, { redirectTo: r });
           if (s.error) throw s.error;
           c("#recoveryMessage").textContent =
-            "Se este e-mail estiver cadastrado, voc\xEA receber\xE1 um link para criar outra senha. Confira tamb\xE9m o spam.";
+            "Solicitação aceita. Recebimento ainda não confirmado. Se este e-mail estiver cadastrado, use o link recebido para salvar a nova senha. Se a mensagem não chegar, confira o endereço ou escolha a entrada por código abaixo.";
         } catch (o) {
           c("#recoveryMessage").textContent = oe(o);
         } finally {
           t.disabled = !1;
         }
       }));
+    const codeButton = document.createElement("button");
+    codeButton.className = "textbutton";
+    codeButton.textContent = "Receber código para entrar sem senha";
+    codeButton.onclick = () => emailCodeAccess(c("#forgotForm").elements.email.value);
+    c("#forgotForm").after(codeButton);
   }
   function Ue() {
     ((c("#app").innerHTML =
@@ -2335,7 +2395,7 @@
             (p = null),
             Z(),
             (c("#authError").textContent =
-              "Senha atualizada. Entre com sua nova senha."));
+              "Recebimento do e-mail confirmado e senha atualizada. Entre com sua nova senha."));
         } catch (o) {
           c("#resetMessage").textContent = oe(o);
         } finally {
@@ -3131,7 +3191,7 @@
     dialog.className = "cameraDialog";
     dialog.setAttribute("aria-label", "Reenviar acesso");
     const portal = "https://methodflowllba-bit.github.io/5S/";
-    dialog.innerHTML = `<div class="cameraHead"><h2>Reenviar acesso</h2><button class="ghost" data-close aria-label="Fechar">×</button></div><p><b>${m(entry.nome)}</b><br>${m(entry.email)}</p><p>Para uma conta já cadastrada, envie um e-mail com o link para definir uma nova senha. Confira também a pasta de spam.</p><button class="primary" data-send-access>Enviar e-mail de acesso</button><p data-access-message role="status"></p><hr><h3>Primeiro acesso</h3><p>Se a pessoa ainda não criou a conta, compartilhe este endereço. Ela deve escolher “Criar minha conta” com o e-mail autorizado.</p><a href="${portal}" target="_blank" rel="noopener">${portal}</a><p><button class="ghost" data-copy-access>Copiar link do portal</button></p>`;
+    dialog.innerHTML = `<div class="cameraHead"><h2>Reenviar acesso</h2><button class="ghost" data-close aria-label="Fechar">×</button></div><p><b>${m(entry.nome)}</b><br>${m(entry.email)}</p><p>Envie um código de acesso por e-mail. Serve para primeiro acesso e para quem já possui conta. O recebimento só é confirmado quando a pessoa valida o código no portal.</p><button class="primary" data-send-access>Enviar código de acesso</button><p data-access-message role="status"></p><hr><h3>Confirmar recebimento</h3><p>Compartilhe o endereço do portal. A pessoa deve escolher “Entrar com código recebido por e-mail”, informar o e-mail autorizado e o código. Para definir outra senha, use “Criar nova senha”.</p><a href="${portal}" target="_blank" rel="noopener">${portal}</a><p><button class="ghost" data-copy-access>Copiar link do portal</button></p>`;
     const close = () => { dialog.close(); dialog.remove(); };
     dialog.querySelector("[data-close]").onclick = close;
     dialog.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
@@ -3148,9 +3208,9 @@
         if (!(await ensurePortalSession())) return;
         const current = entry.email === z ? { ativo: true } : ye.find((row) => row.email === entry.email);
         if (T !== "administrador" || !current?.ativo) throw Error("Reative o acesso deste usuário antes de enviar.");
-        const result = await b.auth.resetPasswordForEmail(entry.email, { redirectTo: portal });
+        const result = await b.auth.signInWithOtp({ email: entry.email, options: { channel: "email" } });
         if (result.error) throw result.error;
-        message.textContent = "Solicitação aceita pelo SuperDB. Se este e-mail já tem uma conta cadastrada, receberá o link para definir uma nova senha. O envio depende da configuração de e-mail do projeto.";
+        message.textContent = "Solicitação aceita pelo SuperDB. Recebimento ainda não confirmado. A pessoa deve validar no portal o código de seis dígitos recebido por e-mail, válido por 10 minutos. Esta tela não acompanha a confirmação em tempo real.";
       } catch (error) { message.textContent = oe(error); }
       finally { button.disabled = false; }
     };
