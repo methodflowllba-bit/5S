@@ -30,6 +30,10 @@ drop policy if exists membros_atualizacao on membros_5s;
 create policy membros_atualizacao on membros_5s for update to authenticated using(proj_p_3634611143.admin_5s() and email <> 'alvaro.batistella@method-flow.com') with check(proj_p_3634611143.admin_5s() and email <> 'alvaro.batistella@method-flow.com');
 revoke all on membros_5s from anon;
 grant select,insert,update on membros_5s to authenticated;
+drop policy if exists membros_exclusao on membros_5s;
+create policy membros_exclusao on membros_5s for delete to authenticated
+ using(proj_p_3634611143.admin_5s() and email <> 'alvaro.batistella@method-flow.com' and email <> lower(auth.email()));
+grant delete on membros_5s to authenticated;
 create table if not exists auditorias_5s (
  id uuid primary key default gen_random_uuid(),
  user_id uuid not null default auth.uid(),
