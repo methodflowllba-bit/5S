@@ -4,7 +4,7 @@ function extract(name){const pts=[...source.matchAll(/^  (?:async )?function ([\
 const audit={id:'a',user_id:'user',area:'Linha 1',data_auditoria:'2026-10-18',comentarios:{_lixeira:{excluida:true}},respostas:{fotos:['evidencia']}};
 function setup({deny=false,cancel=false,pending=false,role='administrador'}={}){
  const ctx={R:false,D:false,p:{user:{id:role==='administrador'?'admin':'user'}},navigator:{onLine:true},rows:[{...structuredClone(audit),_trashPending:pending}],ne:[audit],selectedTrashAudits:new Set(['a']),document:{createElement:()=>({remove(){}}),body:{append(){}}},confirm:()=>!cancel,h(msg){ctx.message=msg},w(){},canManageAudit:r=>role==='administrador'||r.user_id===ctx.p.user.id,$:r=>r.comentarios?._lixeira?.excluida===true};
- ctx.I=()=>ctx.rows;ctx.M=()=>ctx.rows;ctx.ce=x=>ctx.rows=x;ctx.calls=[];
+ ctx.ensurePortalSession=async()=>true;ctx.I=()=>ctx.rows;ctx.M=()=>ctx.rows;ctx.ce=x=>ctx.rows=x;ctx.calls=[];
  ctx.b={auth:{getUser:async()=>({data:{user:ctx.p.user}})},from:table=>({delete(){ctx.calls.push(table);return this},eq(){return this},select:async()=>deny?{error:{message:'RLS recusou'}}:{data:[{id:'a'}]}})};
  vm.createContext(ctx);vm.runInContext(extract('purgeSelectedAudits'),ctx);return ctx;
 }
