@@ -1,0 +1,16 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('app.js','utf8');
+function extract(name){const pts=[...source.matchAll(/^  (?:async )?function ([\w$]+)\(/gm)],i=pts.findIndex(p=>p[1]===name);return source.slice(pts[i].index,pts[i+1].index)}
+const nodes=new Map();const noop=()=>{};
+const button={innerHTML:'Criar conta',disabled:false};const form={elements:{email:{value:'anderson@example.com'},password:{value:'typed-password'}},querySelector:()=>button};
+const ctx={V:'',x:true,g:null,z:'primary@example.com',X:[],W:()=>'',m:s=>s,prepareBlankLogin:noop,webPageLoginVerified:false,p:null,document:{createElement:()=>({})},FormData:class{constructor(target){this.form=target}get(key){return this.form.elements[key]?.value}},Ta:email=>ctx.recoveryEmail=email,h:msg=>ctx.message=msg,Ee:()=>{throw Error('Não pode liberar sessão no erro de conta existente')},c:key=>{if(key==='#authForm')return form;if(!nodes.has(key))nodes.set(key,{innerHTML:'',textContent:'',append:item=>ctx.action=item});return nodes.get(key)},b:{auth:{signUp:async()=>({error:{code:'user_already_exists',message:'email or phone already registered'}})}}};
+vm.createContext(ctx);vm.runInContext(['isExistingAccountError','oe','Z'].map(extract).join(''),ctx);
+(async()=>{
+ assert.equal(ctx.isExistingAccountError({message:'email or phone already registered'}),true);assert.equal(ctx.isExistingAccountError({message:'network failure'}),false);
+ ctx.Z();assert.match(nodes.get('#app').innerHTML,/Criar novo acesso/);assert.match(nodes.get('#app').innerHTML,/Criar nova senha/);
+ await form.onsubmit({preventDefault:noop,target:form});assert.match(nodes.get('#authError').textContent,/autorizar o mesmo e-mail novamente/);assert.equal(ctx.p,null);assert.equal(ctx.webPageLoginVerified,false);assert.equal(button.disabled,false);assert.match(ctx.action.textContent,/Criar nova senha/);ctx.action.onclick();assert.equal(ctx.recoveryEmail,'anderson@example.com');
+ // Recovery only asks for a verified e-mail link; it does not assign a password or authorize membership.
+ const forgot={elements:{email:{value:'anderson@example.com'}},querySelector:()=>button};const rec={g:null,x:false,c:key=>{if(key==='#forgotForm')return forgot;if(!nodes.has(key))nodes.set(key,{});return nodes.get(key)},W:()=>'',m:s=>s,URL,window:{location:{href:'https://methodflowllba-bit.github.io/5S/'}},FormData:ctx.FormData,Z:noop,oe:e=>e.message,b:{auth:{resetPasswordForEmail:async(email,options)=>{rec.sent={email,options};return{data:{}}}}}};
+ vm.createContext(rec);vm.runInContext(extract('Ta'),rec);rec.Ta('anderson@example.com');assert.match(nodes.get('#app').innerHTML,/value="anderson@example.com"/);assert.match(nodes.get('#app').innerHTML,/administrador excluiu seu acesso/);await forgot.onsubmit({preventDefault:noop,target:forgot});assert.equal(rec.sent.email,'anderson@example.com');assert.equal(rec.sent.options.redirectTo,'https://methodflowllba-bit.github.io/5S/');assert.equal(Object.keys(rec.sent.options).length,1);
+ console.log('Aprovado: conta existente recebe mensagem em português e atalho de nova senha, e-mail é preservado na recuperação, sessão não é liberada e a autorização continua dependente do administrador.');
+})().catch(e=>{console.error(e);process.exitCode=1});
