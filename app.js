@@ -78,7 +78,11 @@
       (clearTimeout(o), a.signal?.removeEventListener("abort", r));
     }
   }
+  function isExistingAccountError(error) {
+    return /already.*(registered|exists)|user_already_exists|email_exists|e-?mail.*j[aá].*(cadastrad|registrad)|usu[aá]rio.*j[aá].*existe/i.test(`${error?.code || ""} ${error?.message || ""}`);
+  }
   function oe(e) {
+    if (isExistingAccountError(e)) return "Este e-mail já possui uma conta. Use Criar nova senha. Se o acesso foi excluído, o administrador precisa autorizar o mesmo e-mail novamente.";
     let a = e?.message || "N\xE3o foi poss\xEDvel entrar. Tente novamente.";
     return /invalid.*(credential|password)|incorrect.*password|invalid login|credenciais.*inválid/i.test(
       a,
@@ -2229,9 +2233,9 @@
   function Z() {
     if (V) return Ue();
     ((c("#app").innerHTML =
-      `<div class="login"><section class="loginStory">${W()}<div><p class="eyebrow">UM LUGAR PARA CADA COISA.<br>MAIS RESULTADO EM CADA ETAPA.</p><h1>Melhoria cont\xEDnua<br>come\xE7a no<br><em>dia a dia.</em></h1><p>Avalie os cinco sensos, registre evid\xEAncias<br>e transforme oportunidades em a\xE7\xF5es.</p><div class="sensos">${X.map((e, a) => `<span><b>0${a + 1}</b>${e}</span>`).join("")}</div></div><small>method-flow.com</small></section><section class="loginForm"><div><p class="eyebrow">BEM-VINDO AO PROGRAMA 5S</p><h2>${x ? "Crie seu acesso" : "Entre para continuar"}</h2><p>${x ? "Use o e-mail autorizado pelo administrador." : "Acesse suas auditorias e acompanhe a evolu\xE7\xE3o."}</p><form id="authForm" autocomplete="off"><label>E-mail<input name="email" type="email" autocomplete="off" readonly required placeholder="voce@empresa.com"></label><label>Senha<input name="password" type="password" autocomplete="new-password" readonly minlength="8" required placeholder="Sua senha"></label><label class="showPassword"><span><input id="showPassword" type="checkbox"> Mostrar senha</span></label><button class="primary wide">${x ? "Criar conta" : "Entrar"} <span>\u2192</span></button><p id="authError" role="alert"></p></form><button class="textbutton" id="forgotPassword">Esqueci minha senha</button><br><button class="textbutton" id="toggleAuth">${x ? "J\xE1 tenho conta. Entrar" : "Primeiro acesso? Criar minha conta"}</button><div class="loginNote">${x ? "O cadastro n\xE3o concede permiss\xE3o para consultar auditorias. O administrador define seu acesso." : "Seu login no aplicativo \xE9 separado do login no painel do SuperDB."}</div><p class="subtle">Administrador principal: ${z}</p>${g ? '<p class="subtle">Vers\xE3o Windows \xB7 Ap\xF3s o primeiro login, suas auditorias podem ser feitas sem internet.</p>' : ""}</div></section></div>`),
+      `<div class="login"><section class="loginStory">${W()}<div><p class="eyebrow">UM LUGAR PARA CADA COISA.<br>MAIS RESULTADO EM CADA ETAPA.</p><h1>Melhoria cont\xEDnua<br>come\xE7a no<br><em>dia a dia.</em></h1><p>Avalie os cinco sensos, registre evid\xEAncias<br>e transforme oportunidades em a\xE7\xF5es.</p><div class="sensos">${X.map((e, a) => `<span><b>0${a + 1}</b>${e}</span>`).join("")}</div></div><small>method-flow.com</small></section><section class="loginForm"><div><p class="eyebrow">BEM-VINDO AO PROGRAMA 5S</p><h2>${x ? "Criar novo acesso" : "Entre para continuar"}</h2><p>${x ? "Use o e-mail autorizado pelo administrador." : "Acesse suas auditorias e acompanhe a evolu\xE7\xE3o."}</p><form id="authForm" autocomplete="off"><label>E-mail<input name="email" type="email" autocomplete="off" readonly required placeholder="voce@empresa.com"></label><label>Senha<input name="password" type="password" autocomplete="new-password" readonly minlength="8" required placeholder="Sua senha"></label><label class="showPassword"><span><input id="showPassword" type="checkbox"> Mostrar senha</span></label><button class="primary wide">${x ? "Criar conta" : "Entrar"} <span>\u2192</span></button><p id="authError" role="alert"></p></form><button class="textbutton" id="forgotPassword">Criar nova senha / Esqueci minha senha</button><br><button class="textbutton" id="toggleAuth">${x ? "J\xE1 tenho conta. Entrar" : "Criar novo acesso"}</button><div class="loginNote">${x ? "O cadastro n\xE3o concede permiss\xE3o para consultar auditorias. O administrador define seu acesso." : "Seu login no aplicativo \xE9 separado do login no painel do SuperDB."}</div><p class="subtle">Administrador principal: ${z}</p>${g ? '<p class="subtle">Vers\xE3o Windows \xB7 Ap\xF3s o primeiro login, suas auditorias podem ser feitas sem internet.</p>' : ""}</div></section></div>`),
       prepareBlankLogin(c("#authForm")),
-      (c("#forgotPassword").onclick = Ta),
+      (c("#forgotPassword").onclick = () => Ta()),
       (c("#showPassword").onchange = (e) => {
         c("#authForm").elements.password.type = e.target.checked
           ? "text"
@@ -2261,15 +2265,23 @@
             : h("Cadastro recebido. Confira seu e-mail antes de entrar.");
         } catch (o) {
           c("#authError") && (c("#authError").textContent = oe(o));
+          if (x && isExistingAccountError(o)) {
+            const action = document.createElement("button");
+            action.type = "button";
+            action.className = "ghost";
+            action.textContent = "Criar nova senha para este e-mail";
+            action.onclick = () => Ta(e.target.elements.email.value);
+            c("#authError")?.append(action);
+          }
         } finally {
           ((a.disabled = !1), (a.innerHTML = t));
         }
       }));
   }
-  function Ta() {
-    let e = c("#authForm")?.elements?.email?.value || "";
+  function Ta(email = "") {
+    let e = typeof email === "string" && email ? email : c("#authForm")?.elements?.email?.value || "";
     ((c("#app").innerHTML =
-      `<section class="loginForm"><div>${W()}<h2>Recuperar senha</h2><p>Informe o e-mail cadastrado no Programa 5S.</p><form id="forgotForm"><label>E-mail<input name="email" type="email" autocomplete="email" required value="${m(e)}"></label><button class="primary wide">Enviar link de recupera\xE7\xE3o</button><p id="recoveryMessage" role="status"></p></form><button id="backLogin" class="textbutton">Voltar para entrar</button></div></section>`),
+      `<section class="loginForm"><div>${W()}<h2>Criar nova senha</h2><p>Informe o e-mail já cadastrado. Você receberá um link para definir uma nova senha. Se o administrador excluiu seu acesso, ele precisa autorizar o mesmo e-mail novamente em Usuários.</p><form id="forgotForm"><label>E-mail<input name="email" type="email" autocomplete="email" required value="${m(e)}"></label><button class="primary wide">Enviar link para nova senha</button><p id="recoveryMessage" role="status"></p></form><button id="backLogin" class="textbutton">Voltar para entrar</button></div></section>`),
       (c("#backLogin").onclick = () => {
         ((x = !1), Z());
       }),
@@ -3018,7 +3030,7 @@
         "Pessoas e acessos",
         "Autorize e-mails e defina quem pode auditar ou administrar.",
       ) +
-      '<section class="panel"><h2>Autorizar pessoa</h2><form id="memberForm" class="formgrid"><label>Nome<input name="nome" required maxlength="120"></label><label>E-mail<input name="email" type="email" required></label><label>Perfil<select name="perfil"><option value="usuario">Usu\xE1rio / auditor</option><option value="administrador">Administrador</option></select></label><button class="primary">Salvar autoriza\xE7\xE3o</button></form><p class="muted">A pessoa deve usar \u201CCriar minha conta\u201D com o e-mail autorizado e definir sua pr\xF3pria senha. Nenhum convite \xE9 enviado automaticamente.</p></section><section class="panel"><h2>Acessos autorizados</h2><div id="memberList">Carregando\u2026</div></section>'),
+      '<section class="panel"><h2>Autorizar pessoa</h2><form id="memberForm" class="formgrid"><label>Nome<input name="nome" required maxlength="120"></label><label>E-mail<input name="email" type="email" required></label><label>Perfil<select name="perfil"><option value="usuario">Usu\xE1rio / auditor</option><option value="administrador">Administrador</option></select></label><button class="primary">Salvar autoriza\xE7\xE3o</button></form><p class="muted">Primeiro acesso: autorize o e-mail e peça à pessoa para usar Criar novo acesso. Se a conta já existe ou a autorização foi excluída, autorize o mesmo e-mail novamente e use Reenviar acesso para solicitar uma nova senha. Salvar a autorização não envia e-mail automaticamente.</p></section><section class="panel"><h2>Acessos autorizados</h2><div id="memberList">Carregando\u2026</div></section>'),
       (c("#memberForm").onsubmit = async (e) => {
         e.preventDefault();
         let a = new FormData(e.target),
@@ -3048,7 +3060,7 @@
             if (!o.data?.length)
               throw Error("Autoriza\xE7\xE3o n\xE3o confirmada.");
             (h(
-              "Autoriza\xE7\xE3o salva. A pessoa j\xE1 pode criar a pr\xF3pria conta.",
+              "Autorização salva. Se a conta já existe, a pessoa pode entrar ou usar Criar nova senha. Para primeiro acesso, use Criar novo acesso.",
             ),
               $e());
           } catch (o) {
