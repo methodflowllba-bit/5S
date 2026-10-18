@@ -28,7 +28,7 @@
       a.forEach((r) => {
         let s = o.get(r.id);
         (!s || r._pending) &&
-          (s && $(s) && !r._trashPending
+          (s && s.comentarios?._lixeira && (!r._trashPending || String(s.comentarios._lixeira.em || "") >= String(r.comentarios?._lixeira?.em || ""))
             ? o.set(r.id, {
                 ...r,
                 comentarios: {
@@ -2195,6 +2195,7 @@
     }
   }
   async function ue(e = !0) {
+    const account = p?.user?.id;
     if (D && e)
       return h(
         "Abra uma auditoria e use Enviar ao SuperDB para validar sua conex\xE3o e sess\xE3o.",
@@ -2204,7 +2205,40 @@
       .select("*")
       .order("data_auditoria", { ascending: !1 });
     if (a.error) throw a.error;
-    ((ne = a.data || []), e && (w(), h("Resultados atualizados do portal.")));
+    if (!account || p?.user?.id !== account) return;
+    ne = a.data || [];
+    // Persist the server's deletion/restoration marker in this device's cache.
+    // Keep a newer offline request until it has been acknowledged by the server.
+    const remote = new Map(ne.map((row) => [row.id, row]));
+    ce(M().map((local) => {
+      const marker = remote.get(local.id)?.comentarios?._lixeira;
+      if (!marker || (local._trashPending && String(local.comentarios?._lixeira?.em || "") > String(marker.em || ""))) return local;
+      return { ...local, comentarios: { ...local.comentarios, _lixeira: marker }, _trashPending: false };
+    }));
+    if (d && $(remote.get(d.id) || {}) && !d._trashPending) {
+      // Preserve unfinished work locally, but do not leave an excluded audit open.
+      ze({ ...d, comentarios: { ...d.comentarios, _lixeira: remote.get(d.id).comentarios._lixeira } });
+      d = null;
+      w();
+      h("Esta auditoria foi excluída no portal e está na Lixeira.");
+    }
+    e && (w(), h("Resultados atualizados do portal."));
+  }
+  let refreshingSharedAudits = false;
+  async function refreshSharedAudits() {
+    if (!p || D || R || refreshingSharedAudits || !navigator.onLine || document.visibilityState === "hidden") return;
+    refreshingSharedAudits = true;
+    const account = p.user.id;
+    try {
+      if (M().some((row) => row._trashPending && canManageAudit(row))) await Me();
+      if (p?.user?.id !== account) return;
+      await ue(false);
+      if (!d) w();
+    } catch {
+      // Keep the last confirmed state and retry on the next connection/refresh.
+    } finally {
+      refreshingSharedAudits = false;
+    }
   }
   function Y(e, a, t, o = "") {
     return `<div class="pagehead"><div><p class="eyebrow">${m(e)}</p><h1>${m(a)}</h1><p>${m(t)}</p></div>${o}</div>`;
@@ -2722,7 +2756,7 @@
         t = Te(a),
         o = await b.from("auditorias_5s").select("comentarios").eq("id", a.id);
       if (o.error) throw o.error;
-      if (o.data?.some($) && !a._trashPending)
+      if (o.data?.some($))
         throw Error(
           "Esta auditoria est\xE1 na Lixeira do portal. Atualize a lista e restaure antes de enviar.",
         );
@@ -2942,7 +2976,11 @@
   });
   window.addEventListener("online", () => {
     p && w();
+    refreshSharedAudits();
   });
+  window.addEventListener("focus", refreshSharedAudits);
+  document.addEventListener("visibilitychange", refreshSharedAudits);
+  setInterval(refreshSharedAudits, 15000);
   window.addEventListener("offline", () => {
     p && w();
   });
