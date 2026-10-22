@@ -2277,75 +2277,92 @@
         }
       }));
   }
-  function emailCodeAccess(email = "", firstAccess = true) {
+  function emailCodeAccess(email = "") {
     passwordSetupInProgress = true;
-    let target = "", busy = false, generation = 0;
-    c("#app").innerHTML = `<section class="loginForm"><div>${W()}<h2>Primeiro acesso</h2><p>O administrador já deve ter cadastrado seu e-mail e deixado seu acesso ativo. Confirme seu e-mail para criar e confirmar sua senha na próxima etapa.</p><form id="emailCodeForm"><label>E-mail cadastrado<input name="email" type="email" autocomplete="email" required value="${m(email)}"></label><button class="primary wide">Confirmar meu e-mail</button></form><form id="verifyEmailForm" hidden><p>Digite os seis dígitos recebidos por e-mail. O código vale 10 minutos.</p><label>Código recebido<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label><button class="primary wide">Confirmar e-mail e criar senha</button></form><p id="emailCodeMessage" role="status"></p><button id="backCodeLogin" class="textbutton">Voltar para entrar</button></div></section>`;
-    const request = c("#emailCodeForm"), verify = c("#verifyEmailForm"), message = c("#emailCodeMessage");
-    const receivedButton = document.createElement("button");
-    receivedButton.type = "button"; receivedButton.className = "textbutton"; receivedButton.textContent = "Já recebi um código";
-    receivedButton.onclick = () => {
-      if (busy || !request.reportValidity()) return;
-      target = request.elements.email.value.trim().toLowerCase();
-      verify.hidden = false;
-      message.textContent = `Aguardando confirmação para ${target}. Digite o código recebido.`;
-      verify.elements.code.focus();
+    let busy = false, target = "", verifiedSession = null;
+    c("#app").innerHTML = `<section class="loginForm"><div>${W()}<h2>Primeiro acesso — criar senha</h2><p>Use o e-mail cadastrado pelo administrador. A senha só será registrada com o acesso ativo e após a confirmação de que o e-mail é seu.</p><form id="firstAccessForm"><label>E-mail cadastrado<input name="email" type="email" autocomplete="email" required value="${m(email)}"></label><label>Senha<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><label>Confirmar senha<input name="confirm" type="password" autocomplete="new-password" minlength="8" required></label><label class="showPassword"><span><input id="showFirstPassword" type="checkbox"> Mostrar senhas</span></label><button class="primary wide">Registrar minha senha</button></form><form id="verifyEmailForm" hidden><p>Para concluir, digite o código de seis dígitos recebido por e-mail. Válido por 10 minutos.</p><label>Código de confirmação<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label><button class="primary wide">Confirmar e registrar senha</button></form><p id="firstAccessMessage" role="status"></p><button id="backFirstAccess" class="textbutton">Voltar para entrar</button></div></section>`;
+    const form = c("#firstAccessForm"), verify = c("#verifyEmailForm"), message = c("#firstAccessMessage");
+    const passwordsValid = () => {
+      if (form.elements.password.value.length < 8) { message.textContent = "Use uma senha com pelo menos oito caracteres."; return false; }
+      if (form.elements.password.value !== form.elements.confirm.value) { message.textContent = "As senhas precisam ser iguais."; return false; }
+      return true;
     };
-    request.after(receivedButton);
-    c("#backCodeLogin").onclick = async () => { if (busy) return; generation++; await endFirstAccess(); };
-    request.elements.email.oninput = () => { generation++; target = ""; verify.hidden = true; verify.reset(); message.textContent = "Solicite um código para o e-mail informado."; };
-    request.onsubmit = async (event) => {
+    const lock = (value) => {
+      busy = value;
+      form.querySelector("button").disabled = verify.querySelector("button").disabled = value;
+      form.elements.email.readOnly = value || !!target;
+      form.elements.password.readOnly = form.elements.confirm.readOnly = value;
+    };
+    const savePassword = async () => {
+      await validateActiveFirstAccess(verifiedSession);
+      const result = await b.auth.updateUser({ password: form.elements.password.value });
+      if (result.error) throw result.error;
+      form.reset(); verify.reset();
+      await endFirstAccess();
+      c("#authError").textContent = "Senha registrada. Entre com seu e-mail e a senha que acabou de criar.";
+    };
+    const failure = async (error) => {
+      if (/current_password_required/.test(`${error.code || ""} ${error.message || ""}`)) {
+        const address = target;
+        form.reset(); verify.reset(); await endFirstAccess(); Ta(address);
+        c("#recoveryMessage").textContent = "Este e-mail já possui senha. Receba o link de recuperação para definir outra.";
+      } else if (error.code === "inactive_enrollment" || error.code === "setup_session_expired") {
+        form.reset(); verify.reset(); await endFirstAccess();
+        c("#authError").textContent = oe(error);
+      } else if (verifiedSession) {
+        verify.hidden = true;
+        form.querySelector("button").textContent = "Registrar minha senha";
+        message.textContent = `${oe(error)}. Confira a senha e tente registrar novamente.`;
+      } else message.textContent = oe(error);
+    };
+    c("#showFirstPassword").onchange = (event) => { form.elements.password.type = form.elements.confirm.type = event.target.checked ? "text" : "password"; };
+    c("#backFirstAccess").onclick = async () => { if (busy) return; form.reset(); verify.reset(); await endFirstAccess(); };
+    form.onsubmit = async (event) => {
       event.preventDefault();
-      if (busy) return;
-      const candidate = request.elements.email.value.trim().toLowerCase(), ticket = ++generation;
-      if (!candidate) return;
-      busy = true; target = ""; verify.hidden = true; verify.reset();
-      request.querySelector("button").disabled = true;
-      message.textContent = "Solicitando código ao SuperDB…";
+      if (busy || !passwordsValid()) return;
+      const candidate = form.elements.email.value.trim().toLowerCase();
+      if (!candidate) { message.textContent = "Informe o e-mail cadastrado pelo administrador."; return; }
+      lock(true);
       try {
+        if (verifiedSession) { message.textContent = "Conferindo cadastro ativo e registrando a senha…"; await savePassword(); return; }
+        message.textContent = "Enviando a confirmação para concluir o cadastro da senha…";
         const result = await b.auth.signInWithOtp({ email: candidate, options: { channel: "email" } });
-        if (ticket !== generation) return;
         if (result.error) throw result.error;
-        target = candidate; verify.hidden = false;
-        request.querySelector("button").textContent = "Solicitar outro código";
-        message.textContent = `Solicitação aceita para ${target}. Recebimento ainda não confirmado. Digite o código que chegar por e-mail. Se não chegar, confira o endereço ou solicite outro código; há limite de tentativas.`;
+        target = candidate; verify.hidden = false; verify.reset();
+        form.querySelector("button").textContent = "Reenviar confirmação";
+        message.textContent = `Recebimento ainda não confirmado para ${target}. Digite o código recebido para concluir. A senha ainda não foi registrada.`;
         verify.elements.code.focus();
-      } catch (error) { if (ticket === generation) message.textContent = oe(error); }
-      finally { busy = false; request.querySelector("button").disabled = false; }
+      } catch (error) { await failure(error); }
+      finally { lock(false); }
     };
     verify.onsubmit = async (event) => {
       event.preventDefault();
-      if (busy || !target) return;
+      if (busy || !target || !passwordsValid()) return;
       const code = verify.elements.code.value.trim();
       if (!/^\d{6}$/.test(code)) { message.textContent = "Informe os seis dígitos do código recebido."; return; }
-      busy = true; verify.querySelector("button").disabled = true; request.querySelector("button").disabled = true; request.elements.email.readOnly = true;
-      message.textContent = "Validando o código recebido…";
-      let authenticated = false;
+      lock(true); message.textContent = "Confirmando e-mail, cadastro ativo e senha…";
       try {
         const result = await b.auth.verifyOtp({ email: target, code });
         if (result.error) throw result.error;
-        authenticated = !!result.data?.session;
-        if (!result.data?.session || result.data.session.user?.email?.toLowerCase() !== target) throw Error("O SuperDB não confirmou a sessão deste e-mail.");
-        await validateActiveFirstAccess(result.data.session, true);
-        firstAccessPassword(result.data.session);
-      } catch (error) {
-        if (authenticated) { await endFirstAccess(); if (c("#authError")) c("#authError").textContent = oe(error); }
-        else message.textContent = `Não foi possível confirmar: ${oe(error)}. Confira o código ou solicite outro.`;
-      }
-      finally { busy = false; verify.querySelector("button").disabled = false; request.querySelector("button").disabled = false; request.elements.email.readOnly = false; }
+        verifiedSession = result.data?.session || null;
+        if (!verifiedSession || verifiedSession.user?.email?.toLowerCase() !== target) throw Object.assign(Error("Sua confirmação expirou. Reinicie o primeiro acesso."), { code: "setup_session_expired" });
+        await validateActiveFirstAccess(verifiedSession, true);
+        await savePassword();
+      } catch (error) { await failure(error); }
+      finally { lock(false); }
     };
   }
   async function validateActiveFirstAccess(session, claim = false) {
     const current = await b.auth.getUser();
     if (current.error) throw current.error;
-    if (!current.data?.user || current.data.user.id !== session.user.id || current.data.user.email?.toLowerCase() !== session.user.email?.toLowerCase()) throw Error("Sua confirmação expirou. Reinicie o primeiro acesso.");
+    if (!current.data?.user || current.data.user.id !== session.user.id || current.data.user.email?.toLowerCase() !== session.user.email?.toLowerCase()) throw Object.assign(Error("Sua confirmação expirou. Reinicie o primeiro acesso."), { code: "setup_session_expired" });
     if (!portalTerminalToken) { portalTerminalToken = crypto.randomUUID(); claim = true; }
     const result = await b.rpc(claim ? "iniciar_sessao_5s" : "sessao_5s_ativa", claim ? { novo_terminal: portalTerminalToken } : undefined);
     if (result.error) {
-      if (result.error.code === "42501") throw Error("Seu cadastro não está ativo. Peça ao administrador para cadastrar e ativar este e-mail em Usuários.");
+      if (result.error.code === "42501") throw Object.assign(Error("Seu cadastro não está ativo. Peça ao administrador para cadastrar e ativar este e-mail em Usuários."), { code: "inactive_enrollment" });
       throw result.error;
     }
-    if (result.data !== true) throw Error("Seu acesso foi desativado ou aberto em outro terminal. Peça ao administrador para conferir seu cadastro e reinicie o primeiro acesso.");
+    if (result.data !== true) throw Object.assign(Error("Seu acesso foi desativado ou aberto em outro terminal. Peça ao administrador para conferir seu cadastro e reinicie o primeiro acesso."), { code: "inactive_enrollment" });
   }
   async function endFirstAccess() {
     if (portalTerminalToken) { try { await b.rpc("encerrar_sessao_5s"); } catch {} }
@@ -2354,35 +2371,6 @@
     p = null; T = null; d = null; ne = []; ye = []; x = false;
     portalTerminalToken = "";
     Z();
-  }
-  function firstAccessPassword(session) {
-    c("#app").innerHTML = `<section class="loginForm"><div>${W()}<h2>Criar minha senha</h2><p>E-mail confirmado: <b>${m(session.user.email)}</b>. Seu cadastro está ativo. Defina uma senha com pelo menos oito caracteres.</p><form id="firstPasswordForm"><label>Senha<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><label>Confirmar senha<input name="confirm" type="password" autocomplete="new-password" minlength="8" required></label><label class="showPassword"><span><input id="showFirstPassword" type="checkbox"> Mostrar senhas</span></label><button class="primary wide">Registrar minha senha</button><p id="firstPasswordMessage" role="status"></p></form><button id="existingPasswordRecovery" class="textbutton" hidden>Já tenho senha / Esqueci minha senha</button><br><button id="cancelFirstPassword" class="textbutton">Voltar para entrar</button></div></section>`;
-    const form = c("#firstPasswordForm"), message = c("#firstPasswordMessage");
-    let busy = false;
-    c("#showFirstPassword").onchange = (event) => { form.elements.password.type = form.elements.confirm.type = event.target.checked ? "text" : "password"; };
-    c("#cancelFirstPassword").onclick = async () => { if (!busy) await endFirstAccess(); };
-    c("#existingPasswordRecovery").onclick = async () => { if (busy) return; const email = session.user.email; await endFirstAccess(); Ta(email); };
-    form.onsubmit = async (event) => {
-      event.preventDefault();
-      if (busy) return;
-      if (form.elements.password.value.length < 8) { message.textContent = "Use uma senha com pelo menos oito caracteres."; return; }
-      if (form.elements.password.value !== form.elements.confirm.value) { message.textContent = "As senhas precisam ser iguais."; return; }
-      busy = true; form.querySelector("button").disabled = true;
-      message.textContent = "Conferindo acesso ativo e registrando a senha…";
-      try {
-        await validateActiveFirstAccess(session);
-        const result = await b.auth.updateUser({ password: form.elements.password.value });
-        if (result.error) throw result.error;
-        form.reset();
-        await endFirstAccess();
-        c("#authError").textContent = "Senha registrada. Entre com seu e-mail e a senha que acabou de criar.";
-      } catch (error) {
-        if (/current_password_required/.test(`${error.code || ""} ${error.message || ""}`)) {
-          form.reset(); message.textContent = "Este e-mail já possui senha. Use Esqueci minha senha para definir outra.";
-          c("#existingPasswordRecovery").hidden = false;
-        } else message.textContent = oe(error);
-      } finally { busy = false; form.querySelector("button").disabled = false; }
-    };
   }
   function Ta(email = "") {
     let e = typeof email === "string" && email ? email : c("#authForm")?.elements?.email?.value || "";
