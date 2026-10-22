@@ -86,7 +86,7 @@
     if (/password_breached/.test(code)) return "Esta senha apareceu em vazamentos conhecidos. Escolha outra senha";
     if (/invalid_otp/.test(code)) return "Código incorreto, vencido ou já utilizado";
     if (/rate_limited/.test(code)) return "Limite de tentativas atingido. Aguarde antes de tentar novamente";
-    if (isExistingAccountError(e)) return "Este e-mail já possui uma conta. Use Esqueci minha senha. Se o acesso foi excluído, o administrador precisa autorizar o mesmo e-mail novamente.";
+    if (isExistingAccountError(e)) return "Este e-mail já possui uma conta. Entre com a senha existente. A recuperação sem e-mail de senha de conta existente ainda exige atendimento administrativo.";
     let a = e?.message || "N\xE3o foi poss\xEDvel entrar. Tente novamente.";
     return /invalid.*(credential|password)|incorrect.*password|invalid login|credenciais.*inválid/i.test(
       a,
@@ -2249,7 +2249,7 @@
           : "password";
       }),
       (c("#toggleAuth").onclick = () => {
-        emailCodeAccess(c("#authForm")?.elements.email.value || "", true);
+        firstAccessRegistration(c("#authForm")?.elements.email.value || "");
       }),
       (c("#authForm").onsubmit = async (e) => {
         e.preventDefault();
@@ -2277,79 +2277,39 @@
         }
       }));
   }
-  function emailCodeAccess(email = "") {
+  function firstAccessRegistration(email = "") {
     passwordSetupInProgress = true;
-    let busy = false, target = "", verifiedSession = null;
-    c("#app").innerHTML = `<section class="loginForm"><div>${W()}<h2>Primeiro acesso — criar senha</h2><p>Use o e-mail cadastrado pelo administrador. A senha só será registrada com o acesso ativo e após a confirmação de que o e-mail é seu.</p><form id="firstAccessForm"><label>E-mail cadastrado<input name="email" type="email" autocomplete="email" required value="${m(email)}"></label><label>Senha<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><label>Confirmar senha<input name="confirm" type="password" autocomplete="new-password" minlength="8" required></label><label class="showPassword"><span><input id="showFirstPassword" type="checkbox"> Mostrar senhas</span></label><button class="primary wide">Registrar minha senha</button></form><form id="verifyEmailForm" hidden><p>Para concluir, digite o código de seis dígitos recebido por e-mail. Válido por 10 minutos.</p><label>Código de confirmação<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label><button class="primary wide">Confirmar e registrar senha</button></form><p id="firstAccessMessage" role="status"></p><button id="backFirstAccess" class="textbutton">Voltar para entrar</button></div></section>`;
-    const form = c("#firstAccessForm"), verify = c("#verifyEmailForm"), message = c("#firstAccessMessage");
-    const passwordsValid = () => {
-      if (form.elements.password.value.length < 8) { message.textContent = "Use uma senha com pelo menos oito caracteres."; return false; }
-      if (form.elements.password.value !== form.elements.confirm.value) { message.textContent = "As senhas precisam ser iguais."; return false; }
-      return true;
-    };
-    const lock = (value) => {
-      busy = value;
-      form.querySelector("button").disabled = verify.querySelector("button").disabled = value;
-      form.elements.email.readOnly = value || !!target;
-      form.elements.password.readOnly = form.elements.confirm.readOnly = value;
-    };
-    const savePassword = async () => {
-      await validateActiveFirstAccess(verifiedSession);
-      const result = await b.auth.updateUser({ password: form.elements.password.value });
-      if (result.error) throw result.error;
-      form.reset(); verify.reset();
-      await endFirstAccess();
-      c("#authError").textContent = "Senha registrada. Entre com seu e-mail e a senha que acabou de criar.";
-    };
-    const failure = async (error) => {
-      if (/current_password_required/.test(`${error.code || ""} ${error.message || ""}`)) {
-        const address = target;
-        form.reset(); verify.reset(); await endFirstAccess(); Ta(address);
-        c("#recoveryMessage").textContent = "Este e-mail já possui senha. Receba o link de recuperação para definir outra.";
-      } else if (error.code === "inactive_enrollment" || error.code === "setup_session_expired") {
-        form.reset(); verify.reset(); await endFirstAccess();
-        c("#authError").textContent = oe(error);
-      } else if (verifiedSession) {
-        verify.hidden = true;
-        form.querySelector("button").textContent = "Registrar minha senha";
-        message.textContent = `${oe(error)}. Confira a senha e tente registrar novamente.`;
-      } else message.textContent = oe(error);
-    };
+    c("#app").innerHTML = `<section class="loginForm"><div>${W()}<h2>Primeiro acesso — criar senha</h2><p>Use o e-mail cadastrado pelo administrador e crie sua senha. O acesso ao portal exige cadastro ativo. Não há envio de código ou confirmação por e-mail.</p><form id="firstAccessForm"><label>E-mail cadastrado<input name="email" type="email" autocomplete="email" required value="${m(email)}"></label><label>Senha<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><label>Confirmar senha<input name="confirm" type="password" autocomplete="new-password" minlength="8" required></label><label class="showPassword"><span><input id="showFirstPassword" type="checkbox"> Mostrar senhas</span></label><button class="primary wide">Registrar minha senha</button></form><p id="firstAccessMessage" role="status"></p><button id="backFirstAccess" class="textbutton">Voltar para entrar</button></div></section>`;
+    const form = c("#firstAccessForm"), message = c("#firstAccessMessage");
+    let busy = false;
     c("#showFirstPassword").onchange = (event) => { form.elements.password.type = form.elements.confirm.type = event.target.checked ? "text" : "password"; };
-    c("#backFirstAccess").onclick = async () => { if (busy) return; form.reset(); verify.reset(); await endFirstAccess(); };
+    c("#backFirstAccess").onclick = async () => { if (busy) return; form.reset(); await endFirstAccess(); };
     form.onsubmit = async (event) => {
       event.preventDefault();
-      if (busy || !passwordsValid()) return;
-      const candidate = form.elements.email.value.trim().toLowerCase();
-      if (!candidate) { message.textContent = "Informe o e-mail cadastrado pelo administrador."; return; }
-      lock(true);
+      if (busy) return;
+      const address = form.elements.email.value.trim().toLowerCase();
+      if (!address) { message.textContent = "Informe o e-mail cadastrado pelo administrador."; return; }
+      if (form.elements.password.value.length < 8) { message.textContent = "Use uma senha com pelo menos oito caracteres."; return; }
+      if (form.elements.password.value !== form.elements.confirm.value) { message.textContent = "As senhas precisam ser iguais."; return; }
+      busy = true; form.querySelector("button").disabled = true;
+      message.textContent = "Registrando conta e verificando acesso ativo…";
+      let authenticated = false;
       try {
-        if (verifiedSession) { message.textContent = "Conferindo cadastro ativo e registrando a senha…"; await savePassword(); return; }
-        message.textContent = "Enviando a confirmação para concluir o cadastro da senha…";
-        const result = await b.auth.signInWithOtp({ email: candidate, options: { channel: "email" } });
+        const result = await b.auth.signUp({ email: address, password: form.elements.password.value });
         if (result.error) throw result.error;
-        target = candidate; verify.hidden = false; verify.reset();
-        form.querySelector("button").textContent = "Reenviar confirmação";
-        message.textContent = `Recebimento ainda não confirmado para ${target}. Digite o código recebido para concluir. A senha ainda não foi registrada.`;
-        verify.elements.code.focus();
-      } catch (error) { await failure(error); }
-      finally { lock(false); }
-    };
-    verify.onsubmit = async (event) => {
-      event.preventDefault();
-      if (busy || !target || !passwordsValid()) return;
-      const code = verify.elements.code.value.trim();
-      if (!/^\d{6}$/.test(code)) { message.textContent = "Informe os seis dígitos do código recebido."; return; }
-      lock(true); message.textContent = "Confirmando e-mail, cadastro ativo e senha…";
-      try {
-        const result = await b.auth.verifyOtp({ email: target, code });
-        if (result.error) throw result.error;
-        verifiedSession = result.data?.session || null;
-        if (!verifiedSession || verifiedSession.user?.email?.toLowerCase() !== target) throw Object.assign(Error("Sua confirmação expirou. Reinicie o primeiro acesso."), { code: "setup_session_expired" });
-        await validateActiveFirstAccess(verifiedSession, true);
-        await savePassword();
-      } catch (error) { await failure(error); }
-      finally { lock(false); }
+        const session = result.data?.session;
+        authenticated = !!session;
+        if (!session || session.user?.email?.toLowerCase() !== address) throw Error("O serviço de login não confirmou a conta. Procure o administrador; não será solicitado e-mail de confirmação pelo portal.");
+        await validateActiveFirstAccess(session, true);
+        form.reset(); await endFirstAccess();
+        c("#authError").textContent = "Conta registrada e acesso ativo confirmado. Entre com seu e-mail e a senha criada. Nenhum código por e-mail é necessário.";
+      } catch (error) {
+        if (authenticated) { form.reset(); await endFirstAccess(); c("#authError").textContent = oe(error); }
+        else if (isExistingAccountError(error)) {
+          form.reset();
+          message.textContent = "Este e-mail já tem uma conta de login. O Primeiro acesso não sobrescreve a senha existente. Entre com sua senha atual. Se não souber a senha, a recuperação sem e-mail precisa de atendimento administrativo; ela ainda não está disponível neste portal.";
+        } else message.textContent = oe(error);
+      } finally { busy = false; form.querySelector("button").disabled = false; }
     };
   }
   async function validateActiveFirstAccess(session, claim = false) {
@@ -2373,69 +2333,12 @@
     Z();
   }
   function Ta(email = "") {
-    let e = typeof email === "string" && email ? email : c("#authForm")?.elements?.email?.value || "";
-    ((c("#app").innerHTML =
-      `<section class="loginForm"><div>${W()}<h2>Esqueci minha senha</h2><p>Informe o e-mail cadastrado. Abra o link de confirmação recebido para criar e confirmar a nova senha. Seu cadastro precisa estar ativo para usar o portal; se necessário, peça ao administrador para reativá-lo.</p><form id="forgotForm"><label>E-mail cadastrado<input name="email" type="email" autocomplete="email" required value="${m(e)}"></label><button class="primary wide">Receber link para cadastrar nova senha</button><p id="recoveryMessage" role="status"></p></form><button id="backLogin" class="textbutton">Voltar para entrar</button></div></section>`),
-      (c("#backLogin").onclick = () => {
-        ((x = !1), Z());
-      }),
-      (c("#forgotForm").onsubmit = async (a) => {
-        a.preventDefault();
-        let t = a.target.querySelector("button");
-        ((t.disabled = !0),
-          (c("#recoveryMessage").textContent = "Solicitando ao SuperDB\u2026"));
-        try {
-          let o = String(new FormData(a.target).get("email"))
-              .trim()
-              .toLowerCase(),
-            r = g
-              ? "https://methodflowllba-bit.github.io/5S/"
-              : new URL("./", window.location.href).href,
-            s = await b.auth.resetPasswordForEmail(o, { redirectTo: r });
-          if (s.error) throw s.error;
-          c("#recoveryMessage").textContent =
-            "Solicitação aceita. Se este e-mail tem uma conta, use o link recebido para abrir a tela de nova senha e confirmar a alteração. O recebimento será confirmado após salvar. Para usar o portal, seu cadastro precisa permanecer ativo.";
-        } catch (o) {
-          c("#recoveryMessage").textContent = oe(o);
-        } finally {
-          t.disabled = !1;
-        }
-      }));
+    c("#app").innerHTML = `<section class="loginForm"><div>${W()}<h2>Esqueci minha senha</h2><p>O envio de e-mails de recuperação está desativado neste portal.</p><p>Para uma conta que já existe, a recuperação sem a senha atual depende de atendimento administrativo no serviço de login. Essa redefinição ainda não está disponível aqui.</p><p id="recoveryMessage" role="status">Procure o administrador para regularizar sua credencial. O status Ativo libera o uso do portal, mas não permite sobrescrever uma senha existente.</p><button id="backLogin" class="primary wide">Voltar para entrar</button></div></section>`;
+    c("#backLogin").onclick = () => { x = false; Z(); };
   }
   function Ue() {
-    ((c("#app").innerHTML =
-      `<section class="loginForm"><div>${W()}<h2>Criar nova senha</h2><form id="resetForm"><label>Nova senha<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><label>Confirmar nova senha<input name="confirm" type="password" autocomplete="new-password" minlength="8" required></label><button class="primary wide">Salvar nova senha</button><p id="resetMessage" role="status"></p></form><button id="cancelReset" class="textbutton">Voltar para entrar</button></div></section>`),
-      (c("#cancelReset").onclick = () => {
-        ((V = ""), (x = !1), Z());
-      }),
-      (c("#resetForm").onsubmit = async (e) => {
-        e.preventDefault();
-        let a = new FormData(e.target);
-        if (a.get("password") !== a.get("confirm")) {
-          c("#resetMessage").textContent = "As senhas precisam ser iguais.";
-          return;
-        }
-        let t = e.target.querySelector("button");
-        ((t.disabled = !0),
-          (c("#resetMessage").textContent = "Salvando no SuperDB\u2026"));
-        try {
-          let o = await b.auth.resetPassword({
-            token: V,
-            password: a.get("password"),
-          });
-          if (o.error) throw o.error;
-          ((V = ""),
-            (x = !1),
-            (p = null),
-            Z(),
-            (c("#authError").textContent =
-              "Recebimento do e-mail confirmado e senha atualizada. Entre com sua nova senha."));
-        } catch (o) {
-          c("#resetMessage").textContent = oe(o);
-        } finally {
-          t.disabled = !1;
-        }
-      }));
+    V = "";
+    Ta();
   }
   async function Ee(claim = false) {
     try {
@@ -3236,7 +3139,7 @@
         "Pessoas e acessos",
         "Autorize e-mails e defina quem pode auditar ou administrar.",
       ) +
-      '<section class="panel"><h2>Cadastrar usuário</h2><form id="memberForm" class="formgrid"><label>Nome<input name="nome" required maxlength="120"></label><label>E-mail<input name="email" type="email" required></label><label>Perfil<select name="perfil"><option value="usuario">Usu\xE1rio / auditor</option><option value="administrador">Administrador</option></select></label><button class="primary">Cadastrar e deixar ativo</button></form><p class="muted">Primeiro acesso: autorize o e-mail e peça à pessoa para usar Primeiro acesso — criar senha. Se a conta já existe ou a autorização foi excluída, autorize o mesmo e-mail novamente e use Esqueci minha senha para definir outra senha. Salvar a autorização não envia e-mail automaticamente.</p></section><section class="panel"><h2>Acessos autorizados</h2><div id="memberList">Carregando\u2026</div></section>'),
+      '<section class="panel"><h2>Cadastrar usuário</h2><form id="memberForm" class="formgrid"><label>Nome<input name="nome" required maxlength="120"></label><label>E-mail<input name="email" type="email" required></label><label>Perfil<select name="perfil"><option value="usuario">Usu\xE1rio / auditor</option><option value="administrador">Administrador</option></select></label><button class="primary">Cadastrar e deixar ativo</button></form><p class="muted">Primeiro acesso: autorize o e-mail e peça à pessoa para usar Primeiro acesso — criar senha. Se a conta já existe, a pessoa deve usar a senha existente. Reativar o cadastro não redefine a senha. A recuperação sem e-mail de contas existentes ainda depende de integração administrativa no serviço de login. O portal não envia e-mails.</p></section><section class="panel"><h2>Acessos autorizados</h2><div id="memberList">Carregando\u2026</div></section>'),
       (c("#memberForm").onsubmit = async (e) => {
         e.preventDefault();
         let a = new FormData(e.target),
@@ -3266,7 +3169,7 @@
             if (!o.data?.length)
               throw Error("Autoriza\xE7\xE3o n\xE3o confirmada.");
             (h(
-              "Cadastro salvo. Deixe o acesso ativo e oriente a pessoa a usar Primeiro acesso — criar senha. Se já possui senha, pode entrar ou usar Esqueci minha senha.",
+              "Cadastro salvo. Deixe o acesso ativo e oriente a pessoa a usar Primeiro acesso — criar senha. Se já possui conta de login, deve entrar com a senha existente. Nenhum e-mail será solicitado pelo portal.",
             ),
               $e());
           } catch (o) {
@@ -3302,9 +3205,9 @@
       if (!cell) return;
       const button = document.createElement("button");
       button.className = "ghost";
-      button.textContent = "Reenviar acesso";
+      button.textContent = "Link de acesso";
       button.disabled = !entry.ativo;
-      button.title = entry.ativo ? `Reenviar acesso para ${entry.email}` : "Reative o usuário antes de reenviar o acesso";
+      button.title = entry.ativo ? `Copiar link de acesso para ${entry.email}` : "Reative o usuário para compartilhar o acesso";
       button.onclick = () => showResendAccess(entry);
       cell.append(button);
       if (entry.email !== z) {
@@ -3335,30 +3238,16 @@
     if (T !== "administrador" || !entry.ativo) return;
     const dialog = document.createElement("dialog");
     dialog.className = "cameraDialog";
-    dialog.setAttribute("aria-label", "Reenviar acesso");
+    dialog.setAttribute("aria-label", "Link de acesso");
     const portal = "https://methodflowllba-bit.github.io/5S/";
-    dialog.innerHTML = `<div class="cameraHead"><h2>Reenviar acesso</h2><button class="ghost" data-close aria-label="Fechar">×</button></div><p><b>${m(entry.nome)}</b><br>${m(entry.email)}</p><p>Envie um código de acesso por e-mail. No primeiro acesso, a pessoa confirma o e-mail e registra a própria senha. O recebimento só é confirmado quando a pessoa valida o código no portal.</p><button class="primary" data-send-access>Enviar código de acesso</button><p data-access-message role="status"></p><hr><h3>Confirmar recebimento</h3><p>Compartilhe o endereço do portal. A pessoa deve escolher “Primeiro acesso — criar senha”, informar o e-mail autorizado e o código. Se já possui senha, use “Esqueci minha senha” na tela de login.</p><a href="${portal}" target="_blank" rel="noopener">${portal}</a><p><button class="ghost" data-copy-access>Copiar link do portal</button></p>`;
+    dialog.innerHTML = `<div class="cameraHead"><h2>Link de acesso</h2><button class="ghost" data-close aria-label="Fechar">×</button></div><p><b>${m(entry.nome)}</b><br>${m(entry.email)}</p><p>Cadastro ativo. Para uma conta nova, a pessoa escolhe “Primeiro acesso — criar senha”, informa este e-mail e registra a senha duas vezes. Quem já possui conta entra com a senha existente.</p><p>O portal não envia códigos, convites ou links por e-mail. Copie o endereço para compartilhar pelo meio que preferir.</p><a href="${portal}" target="_blank" rel="noopener">${portal}</a><p><button class="primary" data-copy-access>Copiar link do portal</button></p><p data-access-message role="status"></p><p class="muted">A redefinição sem e-mail de senha de uma conta existente ainda requer integração administrativa no serviço de login.</p>`;
     const close = () => { dialog.close(); dialog.remove(); };
     dialog.querySelector("[data-close]").onclick = close;
     dialog.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
-    const message = dialog.querySelector("[data-access-message]");
     dialog.querySelector("[data-copy-access]").onclick = async () => {
-      try { await navigator.clipboard.writeText(portal); message.textContent = "Link copiado. Compartilhe com o usuário."; }
-      catch { message.textContent = "Copie o endereço do portal exibido abaixo."; }
-    };
-    dialog.querySelector("[data-send-access]").onclick = async (event) => {
-      const button = event.currentTarget;
-      button.disabled = true;
-      message.textContent = "Solicitando e-mail ao SuperDB…";
-      try {
-        if (!(await ensurePortalSession())) return;
-        const current = entry.email === z ? { ativo: true } : ye.find((row) => row.email === entry.email);
-        if (T !== "administrador" || !current?.ativo) throw Error("Reative o acesso deste usuário antes de enviar.");
-        const result = await b.auth.signInWithOtp({ email: entry.email, options: { channel: "email" } });
-        if (result.error) throw result.error;
-        message.textContent = "Solicitação aceita pelo SuperDB. Recebimento ainda não confirmado. A pessoa deve validar no portal o código de seis dígitos recebido por e-mail, válido por 10 minutos. Esta tela não acompanha a confirmação em tempo real.";
-      } catch (error) { message.textContent = oe(error); }
-      finally { button.disabled = false; }
+      const message = dialog.querySelector("[data-access-message]");
+      try { await navigator.clipboard.writeText(portal); message.textContent = "Link copiado. Nenhuma mensagem foi enviada pelo portal."; }
+      catch { message.textContent = "Copie o endereço do portal exibido acima."; }
     };
     document.body.append(dialog);
     dialog.showModal();
