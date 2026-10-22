@@ -2339,7 +2339,7 @@
     const current = await b.auth.getUser();
     if (current.error) throw current.error;
     if (!current.data?.user || current.data.user.id !== session.user.id || current.data.user.email?.toLowerCase() !== session.user.email?.toLowerCase()) throw Error("Sua confirmação expirou. Reinicie o primeiro acesso.");
-    if (!portalTerminalToken) { portalTerminalToken = crypto.randomUUID(); savePortalTerminal(portalTerminalToken); claim = true; }
+    if (!portalTerminalToken) { portalTerminalToken = crypto.randomUUID(); claim = true; }
     const result = await b.rpc(claim ? "iniciar_sessao_5s" : "sessao_5s_ativa", claim ? { novo_terminal: portalTerminalToken } : undefined);
     if (result.error) {
       if (result.error.code === "42501") throw Error("Seu cadastro não está ativo. Peça ao administrador para cadastrar e ativar este e-mail em Usuários.");
@@ -2352,7 +2352,7 @@
     try { await b.auth.signOut(); } catch {}
     passwordSetupInProgress = false; webPageLoginVerified = false;
     p = null; T = null; d = null; ne = []; ye = []; x = false;
-    savePortalTerminal(""); portalTerminalToken = "";
+    portalTerminalToken = "";
     Z();
   }
   function firstAccessPassword(session) {
