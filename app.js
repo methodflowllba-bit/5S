@@ -2942,7 +2942,7 @@
     let a = canManageAudit(d),
       t = le(d);
     ((c("#questions").innerHTML =
-      `<section class="panel"><div class="paneltitle"><h2>Resultado da avalia\xE7\xE3o</h2><strong class="bigScore">${O(U(d))}</strong></div>${N.map((o, r) => `<div class="resultbar"><b>${o.name}</b><div><i style="width:${t[r] || 0}%"></i></div><span>${O(t[r])}</span></div>`).join("")}<p class="muted">Nota final = m\xE9dia dos cinco sensos. Cada senso \xE9 a m\xE9dia de seus crit\xE9rios.</p><label>Coment\xE1rios gerais<textarea id="general" ${e ? "disabled" : ""}>${m(d.comentarios.geral || "")}</textarea></label></section><section class="panel"><div class="paneltitle"><h2>Plano de a\xE7\xE3o</h2>${a ? '<button class="primary" id="addAction">\uFF0B Adicionar a\xE7\xE3o</button>' : ""}</div>${a && d.status === "concluida" ? '<p class="muted">A avalia\xE7\xE3o est\xE1 conclu\xEDda. O auditor pode atualizar as a\xE7\xF5es. Administradores tamb\xE9m podem corrigir a avalia\xE7\xE3o.</p>' : ""}<div id="actionRows">${
+      `<section class="panel"><div class="paneltitle"><h2>Resultado da avalia\xE7\xE3o</h2><strong class="bigScore">${O(U(d))}</strong></div>${N.map((o, r) => `<div class="resultbar"><b>${o.name}</b><div><i style="width:${t[r] || 0}%"></i></div><span>${O(t[r])}</span></div>`).join("")}<p class="muted">Nota final = m\xE9dia dos cinco sensos. Cada senso \xE9 a m\xE9dia de seus crit\xE9rios.</p><label>Coment\xE1rios gerais<textarea id="general" ${e ? "disabled" : ""}>${m(d.comentarios.geral || "")}</textarea></label></section><section class="panel"><div class="paneltitle"><h2>Plano de a\xE7\xE3o</h2><button class="ghost" id="printThisActionPlan" ${d.acoes?.length ? "" : "disabled"}>Imprimir plano / PDF</button>${a ? '<button class="primary" id="addAction">\uFF0B Adicionar a\xE7\xE3o</button>' : ""}</div>${a && d.status === "concluida" ? '<p class="muted">A avalia\xE7\xE3o est\xE1 conclu\xEDda. O auditor pode atualizar as a\xE7\xF5es. Administradores tamb\xE9m podem corrigir a avalia\xE7\xE3o.</p>' : ""}<div id="actionRows">${
         d.acoes
           .map(
             (o, r) =>
@@ -2964,6 +2964,7 @@
       (c("#general").oninput = (o) => {
         e || ((d.comentarios.geral = o.target.value), S());
       }),
+      (c("#printThisActionPlan").onclick = () => printActionPlans((d.acoes || []).map((action, index) => ({ ...action, index, audit: d })), { area: dashboardArea(d), from: d.data_auditoria, to: d.data_auditoria })),
       c("#addAction") &&
         (c("#addAction").onclick = () => {
           a &&
@@ -3123,16 +3124,29 @@
       (e.remove(), (R = !1), c("#sync") && (c("#sync").disabled = !1));
     }
   }
-  function Ca() {
-    let e = I().flatMap((a) =>
+  var actionReportFilters = { owner: null, area: "", from: "", to: "", status: "" };
+  function actionReportRows(records, filters) {
+    return records.filter((audit) => !$(audit)
+      && (!filters.area || dashboardArea(audit) === filters.area)
+      && (!filters.from || audit.data_auditoria >= filters.from)
+      && (!filters.to || audit.data_auditoria <= filters.to)).flatMap((a) =>
       (a.acoes || []).map((t, o) => ({ ...t, audit: a, index: o })),
-    );
+    ).filter((action) => !filters.status || (action.status === "concluida" ? "concluida" : "aberta") === filters.status);
+  }
+  function Ca() {
+    if (actionReportFilters.owner !== p.user.id) actionReportFilters = { owner: p.user.id, area: "", from: "", to: "", status: "" };
+    const areas = [...new Set(I().filter((audit) => audit.acoes?.length).map(dashboardArea))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    if (actionReportFilters.area && !areas.includes(actionReportFilters.area)) areas.push(actionReportFilters.area);
+    const e = actionReportRows(I(), actionReportFilters);
+    const invalid = actionReportFilters.from && actionReportFilters.to && actionReportFilters.from > actionReportFilters.to;
     ((c("#content").innerHTML =
       Y(
         "MELHORIA CONT\xCDNUA",
         "Planos de a\xE7\xE3o",
         "Acompanhe os pr\xF3ximos passos identificados nas auditorias.",
+        '<button class="primary" id="printActionPlans">Imprimir / Salvar PDF</button>',
       ) +
+      `<section class="panel"><div class="actionReportFilters"><label>Área / setor<select id="actionReportArea"><option value="">Todas as áreas</option>${areas.map((area) => `<option value="${m(area)}" ${actionReportFilters.area === area ? "selected" : ""}>${m(area)}</option>`).join("")}</select></label><label>Data inicial da auditoria<input type="date" id="actionReportFrom" value="${m(actionReportFilters.from)}"></label><label>Data final da auditoria<input type="date" id="actionReportTo" value="${m(actionReportFilters.to)}"></label><label>Status da ação<select id="actionReportStatus"><option value="">Todos</option><option value="aberta" ${actionReportFilters.status === "aberta" ? "selected" : ""}>Aberta</option><option value="concluida" ${actionReportFilters.status === "concluida" ? "selected" : ""}>Concluída</option></select></label><button class="ghost" id="clearActionReport">Limpar filtros</button></div><p class="muted">O relatório respeita estes filtros. As datas inicial e final se referem à data da auditoria e incluem os dois dias.</p>${invalid ? '<p role="alert" class="dashboardWarning">A data inicial deve ser anterior ou igual à data final.</p>' : `<p role="status" class="muted">${e.length} ação(ões) encontrada(s).</p>`}</section>` +
       `<section class="panel">${e.length ? `<div class="tablewrap"><table><thead><tr><th>A\xC7\xC3O / \xC1REA</th><th>RESPONS\xC1VEL</th><th>PRAZO</th><th>STATUS</th><th></th></tr></thead><tbody>${e.map((a) => `<tr><td><b>${m(a.descricao || "A\xE7\xE3o sem descri\xE7\xE3o")}</b><small>${m(a.audit.area)}</small></td><td>${m(a.responsavel)}</td><td>${m(a.prazo)}</td><td><span class="pill ${a.status === "concluida" ? "green" : ""}">${a.status === "concluida" ? "Conclu\xEDda" : "Aberta"}</span></td><td>${canManageAudit(a.audit) ? `<button class="ghost" data-toggle-action="${a.audit.id}" data-index="${a.index}">${a.status === "concluida" ? "Reabrir" : "Concluir"}</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty"><h3>Nenhuma a\xE7\xE3o registrada</h3><p>Adicione a\xE7\xF5es na etapa de resumo da auditoria.</p></div>'}</section>`),
       document.querySelectorAll("[data-toggle-action]").forEach(
         (a) =>
@@ -3156,6 +3170,29 @@
             }
           }),
       ));
+    c("#printActionPlans").disabled = !!invalid || !e.length;
+    c("#printActionPlans").onclick = () => printActionPlans(actionReportRows(I(), actionReportFilters), { ...actionReportFilters });
+    [["#actionReportArea", "area"], ["#actionReportFrom", "from"], ["#actionReportTo", "to"], ["#actionReportStatus", "status"]].forEach(([id, key]) => {
+      c(id).onchange = () => { actionReportFilters[key] = c(id).value; Ca(); };
+    });
+    c("#clearActionReport").onclick = () => { actionReportFilters = { owner: p.user.id, area: "", from: "", to: "", status: "" }; Ca(); };
+  }
+  function printActionPlans(rows, filters = {}) {
+    if (filters.from && filters.to && filters.from > filters.to) return h("A data inicial deve ser anterior ou igual à data final.");
+    if (!rows.length) return h("Não há ações para imprimir neste filtro.");
+    const grouped = new Map();
+    rows.forEach((row) => { if (!grouped.has(row.audit.id)) grouped.set(row.audit.id, []); grouped.get(row.audit.id).push(row); });
+    const report = document.createElement("div");
+    report.id = "printReport"; report.className = "actionPlansPrint";
+    report.innerHTML = `${W()}<h1>Programa 5S — Planos de ação</h1><p><b>Área / setor:</b> ${m(filters.area || "Todas as áreas")}<br><b>Período das auditorias:</b> ${dashboardDate(filters.from)} até ${dashboardDate(filters.to)}<br><b>Status das ações:</b> ${filters.status === "concluida" ? "Concluídas" : filters.status === "aberta" ? "Abertas" : "Todos"}<br><b>Emitido em:</b> ${m(new Date().toLocaleString("pt-BR"))}<br><b>Responsável pela emissão:</b> ${m(p.user.email || "")}</p><p>${rows.length} ação(ões) em ${grouped.size} auditoria(s) · ${rows.filter((row) => row.status === "concluida").length} concluída(s) · ${rows.filter((row) => row.status !== "concluida").length} aberta(s).</p>${[...grouped.values()].map((actions) => {
+      const audit = actions[0].audit;
+      return `<section class="actionAuditPrint"><h2>${m(dashboardArea(audit))} · ${dashboardDate(audit.data_auditoria)}</h2><p><b>Auditor:</b> ${m(audit.auditor || "Não informado")} · <b>Auditoria:</b> ${audit.status === "concluida" ? "Concluída" : "Rascunho"}${audit._pending ? " · Envio pendente ao portal" : ""}</p>${actions.map((action) => `<article class="actionCardPrint"><h3>Ação ${action.index + 1} — ${m(action.descricao || "Sem descrição")}</h3><div class="actionMetaPrint"><p><b>Responsável:</b> ${m(action.responsavel || "Não informado")}</p><p><b>Prazo:</b> ${action.prazo ? m(dashboardDate(action.prazo)) : "Não informado"}</p><p><b>Status:</b> ${action.status === "concluida" ? "Concluída" : "Aberta"}</p></div>${action.fotos?.length ? `<div class="printPhotos">${action.fotos.map((photo, index) => `<figure><img src="${ee(photo)}" alt="Foto ${index + 1} da ação ${action.index + 1}"><figcaption>Evidência ${index + 1}</figcaption></figure>`).join("")}</div>` : ""}</article>`).join("")}</section>`;
+    }).join("")}<p>Programa 5S · Method Flow · method-flow.com</p>`;
+    document.querySelector("#printReport")?.remove();
+    document.body.append(report);
+    const cleanup = () => { report.remove(); window.removeEventListener("afterprint", cleanup); };
+    window.addEventListener("afterprint", cleanup);
+    Promise.all([...report.querySelectorAll("img")].map((image) => image.decode().catch(() => { image.alt += " — imagem indisponível"; }))).then(() => window.print());
   }
   async function $e() {
     if (T !== "administrador" || !(await ensurePortalSession())) return;
