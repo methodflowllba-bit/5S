@@ -2175,7 +2175,7 @@
     }
     if (
       ((c("#app").innerHTML =
-        `<aside>${W()}<div class="navlabel">ESPA\xC7O DE TRABALHO</div><nav>${[["inicio", "\u25EB", "Vis\xE3o geral"], ["auditorias", "\u2611", "Auditorias"], ["acoes", "\u2197", "Planos de a\xE7\xE3o"], ...(T === "administrador" ? [["usuarios", "\u2659", "Usu\xE1rios"], ["ajuda", "\u24D8", "Instalar e configurar"]] : [])].map(([e, a, t]) => `<button data-nav="${e}" class="${C === e ? "selected" : ""}"><span>${a}</span>${t}</button>`).join("")}</nav><div class="asidefoot"><span class="avatar">${m(ka(p.user.email || "MF"))}</span><div><b>${m((p.user.email || "").split("@")[0])}</b><small>${T === "administrador" ? "Administrador" : T === "usuario" ? "Auditor" : "Acesso pendente"}</small></div><button id="logout" title="Sair" aria-label="Sair">\u21AA</button></div></aside><main><header><span>GEST\xC3O DO AMBIENTE DE TRABALHO</span><div><span class="connection ${navigator.onLine ? "" : "offline"}">\u25CF ${D ? "Modo local" : navigator.onLine ? "Online" : "Sem internet"}</span><button class="ghost" id="logoutTop">Sair da conta</button>${T === "administrador" ? `<button class="ghost" id="installTop">${g ? "Vers\xE3o instalada \u2713" : "Instalar app \u2197"}</button>` : ""}</div></header><div id="content"></div><footer>Programa 5S \xB7 Method Flow <span>Organiza\xE7\xE3o que transforma resultados.</span></footer></main>`),
+        `<aside>${W()}<div class="navlabel">ESPA\xC7O DE TRABALHO</div><nav>${[["inicio", "\u25EB", "Vis\xE3o geral"], ["dashboard", "◈", "Dashboard"], ["auditorias", "\u2611", "Auditorias"], ["acoes", "\u2197", "Planos de a\xE7\xE3o"], ...(T === "administrador" ? [["usuarios", "\u2659", "Usu\xE1rios"], ["ajuda", "\u24D8", "Instalar e configurar"]] : [])].map(([e, a, t]) => `<button data-nav="${e}" class="${C === e ? "selected" : ""}"><span>${a}</span>${t}</button>`).join("")}</nav><div class="asidefoot"><span class="avatar">${m(ka(p.user.email || "MF"))}</span><div><b>${m((p.user.email || "").split("@")[0])}</b><small>${T === "administrador" ? "Administrador" : T === "usuario" ? "Auditor" : "Acesso pendente"}</small></div><button id="logout" title="Sair" aria-label="Sair">\u21AA</button></div></aside><main><header><span>GEST\xC3O DO AMBIENTE DE TRABALHO</span><div><span class="connection ${navigator.onLine ? "" : "offline"}">\u25CF ${D ? "Modo local" : navigator.onLine ? "Online" : "Sem internet"}</span><button class="ghost" id="logoutTop">Sair da conta</button>${T === "administrador" ? `<button class="ghost" id="installTop">${g ? "Vers\xE3o instalada \u2713" : "Instalar app \u2197"}</button>` : ""}</div></header><div id="content"></div><footer>Programa 5S \xB7 Method Flow <span>Organiza\xE7\xE3o que transforma resultados.</span></footer></main>`),
       document.querySelectorAll("[data-nav]").forEach(
         (e) =>
           (e.onclick = () => {
@@ -2211,6 +2211,7 @@
     if (d) return k();
     if (C === "usuarios") return $e();
     if (C === "acoes") return Ca();
+    if (C === "dashboard") return showDashboard();
     if (C === "auditorias") return Ge();
     Oa();
   }
@@ -2541,7 +2542,7 @@
         "VIS\xC3O GERAL",
         "Cada melhoria conta.",
         "Acompanhe as auditorias e o cuidado com o ambiente de trabalho.",
-        Fe(),
+        `<div class="dashboardHeadActions"><button class="ghost" id="openDashboard"><span aria-hidden="true">◈</span> Dashboard</button>${Fe()}</div>`,
       ) +
       `<div class="metrics"><article><span>AUDITORIAS REALIZADAS</span><strong>${a.length.toString().padStart(2, "0")}</strong><small>Avalia\xE7\xF5es conclu\xEDdas</small></article><article><span>RESULTADO M\xC9DIO</span><strong>${O(o)}</strong><small>M\xE9dia das auditorias conclu\xEDdas</small></article><article><span>RASCUNHOS</span><strong>${e
         .filter((s) => s.status === "rascunho")
@@ -2552,9 +2553,83 @@
         )}</strong><small>Continue de onde parou</small></article><article><span>ENVIO PENDENTE</span><strong>${r.toString().padStart(2, "0")}</strong><small>Salvos neste aparelho</small></article></div><div class="homegrid"><section class="panel"><div class="paneltitle"><h2>Os cinco sensos</h2><span class="pill">Peso igual \xB7 20% cada</span></div><p class="muted">Uma rotina simples para um ambiente melhor.</p><div class="sensoCards">${N.map((s, i) => `<div><span class="sensoNum c${i}">0${i + 1}</span><div><b>${s.name}</b><small>${X[i]} \xB7 ${s.items.length} crit\xE9rios de avalia\xE7\xE3o</small></div><span>\u2197</span></div>`).join("")}</div></section><section class="feature"><p class="eyebrow">DO DIAGN\xD3STICO \xC0 A\xC7\xC3O</p><h2>Observe.<br>Registre.<br><em>Transforme.</em></h2><p>Leve o checklist at\xE9 a \xE1rea, registre os pontos de aten\xE7\xE3o e acompanhe as a\xE7\xF5es de melhoria.</p><button class="newAudit">Iniciar uma avalia\xE7\xE3o \u2192</button><div class="rings"></div></section></div><section class="panel"><div class="paneltitle"><h2>Auditorias recentes</h2><button class="textbutton" id="seeAll">Ver todas \u2192</button></div>${Se(e.slice(0, 5))}</section>`),
       Be(),
       Ae(),
+      (c("#openDashboard").onclick = () => { C = "dashboard"; d = null; w(); }),
       (c("#seeAll").onclick = () => {
         ((C = "auditorias"), w());
       }));
+  }
+  var dashboardFilters = { owner: null, area: "", from: "", to: "" };
+  function dashboardArea(row) {
+    return String(row.area || "").trim() || "Área não informada";
+  }
+  function dashboardDate(value) {
+    return value ? value.split("-").reverse().join("/") : "Sem limite";
+  }
+  function dashboardModel(records, filters) {
+    if (filters.from && filters.to && filters.from > filters.to) return { error: "A data inicial deve ser anterior ou igual à data final.", rows: [], scores: [] };
+    const filtered = records.filter((row) => row.status === "concluida" && !$(row)
+      && (!filters.area || dashboardArea(row) === filters.area)
+      && (!filters.from || row.data_auditoria >= filters.from)
+      && (!filters.to || row.data_auditoria <= filters.to));
+    const evaluated = filtered.map((row) => ({ row, scores: le(row) }));
+    const rows = evaluated.filter(({ scores }) => scores.length === 5 && scores.every((value) => Number.isFinite(value) && value >= 0 && value <= 100));
+    const scores = N.map((_, index) => rows.length ? rows.reduce((sum, item) => sum + item.scores[index], 0) / rows.length : null);
+    return { rows, scores, excluded: filtered.length - rows.length,
+      average: rows.length ? scores.reduce((sum, value) => sum + value, 0) / 5 : null,
+      areas: new Set(rows.map(({ row }) => dashboardArea(row))).size,
+      pending: rows.filter(({ row }) => row._pending).length };
+  }
+  function dashboardRadar(scores) {
+    const cx = 320, cy = 235, radius = 145;
+    const point = (index, fraction) => {
+      const angle = -Math.PI / 2 + index * 2 * Math.PI / 5;
+      return [cx + Math.cos(angle) * radius * fraction, cy + Math.sin(angle) * radius * fraction];
+    };
+    const pair = (coords) => coords.map((value) => value.toFixed(2)).join(",");
+    const polygon = (fraction) => N.map((_, index) => pair(point(index, fraction))).join(" ");
+    return `<svg class="dashboardRadar" viewBox="0 0 640 475" role="img" aria-label="Radar dos cinco sensos: ${m(N.map((senso, index) => `${senso.name} ${O(scores[index])}`).join("; "))}"><title>Pontuação média por senso, de 0 a 100%</title>${[.25, .5, .75, 1].map((fraction) => `<polygon points="${polygon(fraction)}" fill="none" stroke="#cbd7e6"/><text x="326" y="${cy - radius * fraction + 12}" class="radarScale">${fraction * 100}%</text>`).join("")}${N.map((_, index) => `<line x1="${cx}" y1="${cy}" x2="${point(index, 1)[0]}" y2="${point(index, 1)[1]}" stroke="#dbe4ef"/>`).join("")}<polygon points="${scores.map((score, index) => pair(point(index, score / 100))).join(" ")}" fill="#0757b6" fill-opacity="0.16" stroke="#0757b6" stroke-width="3"/>${N.map((senso, index) => {
+      const dot = point(index, scores[index] / 100), label = point(index, 1.34);
+      const anchor = index === 0 ? "middle" : index < 3 ? "start" : "end";
+      return `<circle cx="${dot[0]}" cy="${dot[1]}" r="4.5" fill="#0757b6"><title>${m(senso.name)}: ${O(scores[index])}</title></circle><text x="${label[0]}" y="${label[1]}" text-anchor="${anchor}" class="radarLabel">${m(senso.name)}<tspan x="${label[0]}" dy="19" class="radarScore">${O(scores[index])}</tspan></text>`;
+    }).join("")}</svg>`;
+  }
+  function dashboardResults(model) {
+    if (model.error) return `<div class="empty" role="alert"><p>${m(model.error)}</p></div>`;
+    const warning = model.excluded ? `<p class="dashboardWarning">${model.excluded} auditoria(s) concluída(s) com notas incompletas ou inválidas foram desconsideradas.</p>` : "";
+    if (!model.rows.length) return `${warning}<div class="empty"><h3>Nenhuma auditoria concluída com pontuação neste filtro</h3><p>Altere a área ou o período para consultar outros resultados.</p></div>`;
+    return `${warning}<div class="metrics dashboardMetrics"><article><span>AUDITORIAS CONCLUÍDAS</span><strong>${model.rows.length}</strong><small>Consideradas no gráfico</small></article><article><span>RESULTADO MÉDIO</span><strong>${O(model.average)}</strong><small>Mesmo peso para os cinco sensos</small></article><article><span>ÁREAS AVALIADAS</span><strong>${model.areas}</strong><small>No período selecionado</small></article><article><span>ENVIO PENDENTE</span><strong>${model.pending}</strong><small>Incluídas a partir deste aparelho</small></article></div><div class="dashboardGrid"><section class="panel dashboardChart"><div class="paneltitle"><h2>Radar dos cinco sensos</h2><span class="pill">Escala 0 a 100%</span></div>${dashboardRadar(model.scores)}<p class="muted">Média das auditorias selecionadas. Cada auditoria tem o mesmo peso.</p></section><section class="panel"><h2>Pontuação por senso</h2><div class="dashboardSenses">${N.map((senso, index) => `<div><span class="sensoNum c${index}">0${index + 1}</span><div><b>${m(senso.name)}</b><small>${X[index]}</small></div><strong>${O(model.scores[index])}</strong></div>`).join("")}</div><p class="muted">A nota de cada senso segue o cálculo do checklist: média dos seus critérios. A nota final é a média dos cinco sensos.</p></section></div><section class="panel dashboardAudits"><h2>Auditorias consideradas</h2><div class="tablewrap"><table><thead><tr><th>DATA</th><th>ÁREA / AUDITOR</th>${X.map((name) => `<th>${name}</th>`).join("")}<th>FINAL</th></tr></thead><tbody>${model.rows.map(({ row, scores }) => `<tr><td>${m(dashboardDate(row.data_auditoria))}</td><td><b>${m(dashboardArea(row))}</b><small>${m(row.auditor || "")}${row._pending ? " · Envio pendente" : ""}</small></td>${scores.map((score) => `<td>${O(score)}</td>`).join("")}<td><b>${O(scores.reduce((sum, score) => sum + score, 0) / 5)}</b></td></tr>`).join("")}</tbody></table></div></section>`;
+  }
+  function showDashboard() {
+    if (dashboardFilters.owner !== p.user.id) dashboardFilters = { owner: p.user.id, area: "", from: "", to: "" };
+    const records = I(), areas = [...new Set(records.map(dashboardArea))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    if (dashboardFilters.area && !areas.includes(dashboardFilters.area)) areas.push(dashboardFilters.area);
+    c("#content").innerHTML = Y("ANÁLISE DOS RESULTADOS", "Dashboard", "Acompanhe a pontuação dos cinco sensos por área e período.", '<button class="primary" id="printDashboard">Imprimir / Salvar PDF</button>')
+      + `<section class="panel"><div class="dashboardFilters"><label>Área / setor<select id="dashboardArea"><option value="">Todas as áreas</option>${areas.map((area) => `<option value="${m(area)}" ${dashboardFilters.area === area ? "selected" : ""}>${m(area)}</option>`).join("")}</select></label><label>Data inicial<input id="dashboardFrom" type="date" value="${m(dashboardFilters.from)}"></label><label>Data final<input id="dashboardTo" type="date" value="${m(dashboardFilters.to)}"></label><button class="ghost" id="clearDashboard">Limpar filtros</button><button class="ghost" id="refreshDashboard">↻ Atualizar portal</button></div><p class="muted">Filtra pela data da auditoria, incluindo o primeiro e o último dia. Sem datas, considera todo o histórico. Rascunhos e auditorias na lixeira não entram no cálculo.</p></section><p id="dashboardSummary" class="dashboardSummary" role="status"></p><div id="dashboardResults"></div>`;
+    const update = () => {
+      dashboardFilters.area = c("#dashboardArea").value;
+      dashboardFilters.from = c("#dashboardFrom").value;
+      dashboardFilters.to = c("#dashboardTo").value;
+      const model = dashboardModel(I(), dashboardFilters);
+      c("#dashboardSummary").textContent = `${dashboardFilters.area || "Todas as áreas"} · De ${dashboardDate(dashboardFilters.from)} até ${dashboardDate(dashboardFilters.to)}`;
+      c("#dashboardResults").innerHTML = dashboardResults(model);
+      c("#printDashboard").disabled = !!model.error || !model.rows.length;
+    };
+    ["#dashboardArea", "#dashboardFrom", "#dashboardTo"].forEach((id) => { c(id).onchange = update; });
+    c("#clearDashboard").onclick = () => { ["#dashboardArea", "#dashboardFrom", "#dashboardTo"].forEach((id) => { c(id).value = ""; }); update(); };
+    c("#refreshDashboard").onclick = () => ue().catch(v);
+    c("#printDashboard").onclick = () => printDashboard(dashboardModel(I(), dashboardFilters), { ...dashboardFilters });
+    update();
+  }
+  function printDashboard(model, filters) {
+    if (model.error || !model.rows.length) return h(model.error || "Não há resultados para imprimir neste filtro.");
+    document.querySelector("#printReport")?.remove();
+    const report = document.createElement("div");
+    report.id = "printReport"; report.className = "dashboardPrint";
+    report.innerHTML = `${W()}<h1>Dashboard — Programa 5S</h1><p><b>Área / setor:</b> ${m(filters.area || "Todas as áreas")}<br><b>Período:</b> ${dashboardDate(filters.from)} até ${dashboardDate(filters.to)} (datas inclusivas)<br><b>Emitido em:</b> ${m(new Date().toLocaleString("pt-BR"))}<br><b>Responsável pela emissão:</b> ${m(p.user.email || "")}</p>${dashboardResults(model)}<p>Programa 5S · Method Flow · method-flow.com</p>`;
+    document.body.append(report);
+    const cleanup = () => { report.remove(); window.removeEventListener("afterprint", cleanup); };
+    window.addEventListener("afterprint", cleanup);
+    Promise.all([...report.querySelectorAll("img")].map((image) => image.decode().catch(() => {}))).then(() => window.print());
   }
   function Se(e) {
     return e.length
