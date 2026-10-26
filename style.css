@@ -17,3 +17,11 @@
 .checklistToolbar{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:20px}.checklistToolbar label{flex:1;min-width:200px}.checklistToolbar select{margin:0}.checklistQuestion{border-top:1px solid #e3eaf2;margin-top:22px;padding-top:20px}.checklistQuestion>label textarea{min-height:90px}.checklistRatings{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.checklistRatings label{font-size:11px;color:#526983}.checklistRatings b{color:#0757b6;font-size:16px}.checklistRatings textarea{min-height:125px;font-size:12px}.checklistSenso .paneltitle{flex-wrap:wrap}.checklistQuestion h3{margin:0 0 10px}
 @media(max-width:1100px){.checklistRatings{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.checklistRatings{grid-template-columns:1fr}.checklistToolbar{align-items:stretch}.checklistToolbar>*{width:100%}}
+/* Identidade visual escolhida pela administração. */
+.brand .companyLogo{width:100px;height:58px;max-width:40%;object-fit:contain;border-radius:0;background:transparent}
+.methodFlowFooter{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;font-size:11px;color:#65746d}
+.methodFlowFooter img{width:90px;height:42px;object-fit:contain}
+.logoPreview{display:flex;align-items:center;justify-content:center;min-height:130px;max-width:420px;padding:16px;margin:16px 0;background:#f7faf8;border:1px dashed #bdcbc2;border-radius:12px;color:#65746d}
+.logoPreview img{max-width:100%;max-height:140px;object-fit:contain}
+#brandFile{display:block;max-width:240px;font-size:12px;margin-top:8px}
+@media print{.brand .companyLogo{width:150px;height:75px;max-width:40%;object-fit:contain}.methodFlowFooter{break-inside:avoid;margin-top:22px;border-top:1px solid #ccc;padding-top:10px}.methodFlowFooter img{width:85px;height:38px}}
