@@ -28,7 +28,7 @@ const deleted = {...base, comentarios:{_lixeira:{excluida:true,em:'2026-10-18T16
     await ctx.ue(false); assert.equal(ctx.local[0]._trashPending,true);
     assert.equal(ctx.ke(ctx.ne,ctx.local).length,0);
   }
-  const ctx={p:{user:{id:'user'}},D:false,R:false,passwordSetupInProgress:true,navigator:{onLine:true},document:{visibilityState:'visible'},M:()=>[],w(){this.renders++},renders:0};
+  const ctx={C:'inicio',p:{user:{id:'user'}},D:false,R:false,passwordSetupInProgress:true,navigator:{onLine:true},document:{visibilityState:'visible'},M:()=>[],w(){this.renders++},renders:0};
   ctx.ensurePortalSession=async()=>true;ctx.ue=async()=>{ctx.reads=(ctx.reads||0)+1};vm.createContext(ctx);
   vm.runInContext('let refreshingSharedAudits=false;'+extract('refreshSharedAudits'),ctx);
   await ctx.refreshSharedAudits();assert.equal(ctx.reads,undefined,'Não atualizar o portal durante cadastro de senha');ctx.passwordSetupInProgress=false;
