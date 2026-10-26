@@ -2143,7 +2143,7 @@
     }
   }
   function le(e) {
-    return N.map((a) => {
+    return auditSenses(e).map((a) => {
       let t = a.items
         .map((o) => e.respostas?.[o.id]?.nota)
         .filter((o) => typeof o == "number");
@@ -2177,7 +2177,7 @@
     }
     if (
       ((c("#app").innerHTML =
-        `<aside>${W()}<div class="navlabel">ESPA\xC7O DE TRABALHO</div><nav>${[["inicio", "\u25EB", "Vis\xE3o geral"], ["dashboard", "◈", "Dashboard"], ["auditorias", "\u2611", "Auditorias"], ["acoes", "\u2197", "Planos de a\xE7\xE3o"], ...(T === "administrador" ? [["usuarios", "\u2659", "Usu\xE1rios"], ["ajuda", "\u24D8", "Instalar e configurar"]] : [])].map(([e, a, t]) => `<button data-nav="${e}" class="${C === e ? "selected" : ""}"><span>${a}</span>${t}</button>`).join("")}</nav><div class="asidefoot"><span class="avatar">${m(ka(p.user.email || "MF"))}</span><div><b>${m((p.user.email || "").split("@")[0])}</b><small>${T === "administrador" ? "Administrador" : T === "usuario" ? "Auditor" : "Acesso pendente"}</small></div><button id="logout" title="Sair" aria-label="Sair">\u21AA</button></div></aside><main><header><span>GEST\xC3O DO AMBIENTE DE TRABALHO</span><div><span class="connection ${navigator.onLine ? "" : "offline"}">\u25CF ${D ? "Modo local" : navigator.onLine ? "Online" : "Sem internet"}</span><button class="ghost" id="logoutTop">Sair da conta</button>${T === "administrador" ? `<button class="ghost" id="installTop">${g ? "Vers\xE3o instalada \u2713" : "Instalar app \u2197"}</button>` : ""}</div></header><div id="content"></div><footer>Programa 5S \xB7 Method Flow <span>Organiza\xE7\xE3o que transforma resultados.</span></footer></main>`),
+        `<aside>${W()}<div class="navlabel">ESPA\xC7O DE TRABALHO</div><nav>${[["inicio", "\u25EB", "Vis\xE3o geral"], ["dashboard", "◈", "Dashboard"], ["auditorias", "\u2611", "Auditorias"], ["acoes", "\u2197", "Planos de a\xE7\xE3o"], ...(T === "administrador" ? [["usuarios", "\u2659", "Usu\xE1rios"], ["ajuda", "⚙", "Configuração"]] : [])].map(([e, a, t]) => `<button data-nav="${e}" class="${C === e ? "selected" : ""}"><span>${a}</span>${t}</button>`).join("")}</nav><div class="asidefoot"><span class="avatar">${m(ka(p.user.email || "MF"))}</span><div><b>${m((p.user.email || "").split("@")[0])}</b><small>${T === "administrador" ? "Administrador" : T === "usuario" ? "Auditor" : "Acesso pendente"}</small></div><button id="logout" title="Sair" aria-label="Sair">\u21AA</button></div></aside><main><header><span>GEST\xC3O DO AMBIENTE DE TRABALHO</span><div><span class="connection ${navigator.onLine ? "" : "offline"}">\u25CF ${D ? "Modo local" : navigator.onLine ? "Online" : "Sem internet"}</span><button class="ghost" id="logoutTop">Sair da conta</button>${T === "administrador" ? `<button class="ghost" id="installTop">${g ? "Vers\xE3o instalada \u2713" : "Instalar app \u2197"}</button>` : ""}</div></header><div id="content"></div><footer>Programa 5S \xB7 Method Flow <span>Organiza\xE7\xE3o que transforma resultados.</span></footer></main>`),
       document.querySelectorAll("[data-nav]").forEach(
         (e) =>
           (e.onclick = () => {
@@ -2206,7 +2206,7 @@
       return Ia();
     if (!T) {
       ((c("#content").innerHTML =
-        `<div class="pagehead"><div><p class="eyebrow">PROGRAMA 5S</p><h1>Seu acesso est\xE1 pendente</h1><p>O administrador precisa autorizar ${m(p.user.email)} para acessar as auditorias.</p></div></div><section class="panel"><p>Se o projeto ainda n\xE3o foi configurado, aplique o SQL dispon\xEDvel em \u201CInstalar e configurar\u201D.</p><button id="retry" class="primary">Verificar acesso novamente</button></section>`),
+        `<div class="pagehead"><div><p class="eyebrow">PROGRAMA 5S</p><h1>Seu acesso est\xE1 pendente</h1><p>O administrador precisa autorizar ${m(p.user.email)} para acessar as auditorias.</p></div></div><section class="panel"><p>Se o projeto ainda n\xE3o foi configurado, aplique o SQL dispon\xEDvel em \u201CConfiguração\u201D.</p><button id="retry" class="primary">Verificar acesso novamente</button></section>`),
         (c("#retry").onclick = Ee));
       return;
     }
@@ -2353,7 +2353,7 @@
         T = e.data?.find((a) => a.ativo)?.perfil || null;
       }
       (T
-        ? (await ue(!1),
+        ? (await loadChecklistTemplates(), await ue(!1),
           (D = !1),
           g &&
             g.write(
@@ -2415,6 +2415,7 @@
   let refreshingSharedAudits = false;
   async function refreshSharedAudits() {
     if (passwordSetupInProgress) return;
+    if (C === "ajuda") return;
     if (!p || R || refreshingSharedAudits || !navigator.onLine || document.visibilityState === "hidden") return;
     refreshingSharedAudits = true;
     const account = p.user.id;
@@ -2444,29 +2445,7 @@
     return '<button class="primary newAudit">\uFF0B Nova auditoria</button>';
   }
   function Be() {
-    document.querySelectorAll(".newAudit").forEach(
-      (e) =>
-        (e.onclick = () => {
-          ((d = {
-            id: crypto.randomUUID(),
-            user_id: p.user.id,
-            area: "",
-            data_auditoria: new Date().toLocaleDateString("en-CA"),
-            auditor: p.user.display_name || p.user.email,
-            acompanhantes: "",
-            status: "rascunho",
-            respostas: {},
-            comentarios: {},
-            acoes: [],
-            criado_em: new Date().toISOString(),
-            atualizado_em: new Date().toISOString(),
-            versao_checklist: "21.09.2023-aba2",
-          }),
-            (E = 0),
-            (C = "auditorias"),
-            w());
-        }),
-    );
+    document.querySelectorAll(".newAudit").forEach((button) => { button.onclick = chooseAuditChecklist; });
   }
   function Oa() {
     let e = I(),
@@ -2661,13 +2640,12 @@
       }));
   }
   function k() {
+    const senses = auditSenses(d), totalQuestions = senses.reduce((sum, senso) => sum + senso.items.length, 0);
     let e = !canManageAudit(d),
       a = d.status === "concluida",
       t = e || (a && T !== "administrador"),
       o = le(d),
-      r = Object.values(d.respostas).filter(
-        (s) => typeof s.nota == "number",
-      ).length;
+      r = senses.flatMap((senso) => senso.items).filter((item) => typeof d.respostas?.[item.id]?.nota === "number").length;
     if (
       ((c("#content").innerHTML =
         Y(
@@ -2688,7 +2666,7 @@
           )
           .join(
             "",
-          )}</div></section><div class="progressrow"><span>${r} de 21 itens avaliados</span><div><i style="width:${(r / 21) * 100}%"></i></div><b>${O(U(d))}</b></div><div class="tabs">${N.map((s, i) => `<button data-step="${i}" class="${E === i ? "current" : ""}"><small>${X[i]}</small><b>${i + 1}. ${s.name}</b><span>${O(o[i])}</span></button>`).join("")}<button data-step="5" class="${E === 5 ? "current" : ""}"><small>PR\xD3XIMOS PASSOS</small><b>Resumo e a\xE7\xF5es</b><span>\u2192</span></button></div><div id="questions"></div><div class="auditBottom"><span id="saveState">${d._pending ? "Salvo neste aparelho \xB7 envio pendente" : "Salvo no portal"}</span><div>${e ? "" : `<button class="ghost" id="localSave">Salvar no aparelho</button><button class="ghost" id="sync">${g ? "Conectar e enviar ao SuperDB \u2191" : "Enviar ao portal \u2191"}</button>`}${t ? "" : '<button class="primary" id="finish">Concluir auditoria \u2713</button>'}<button class="ghost" id="print">Imprimir / PDF</button></div></div>`),
+          )}</div><p class="muted">Checklist: ${m(d.comentarios?._checklist?.empresa || "Padrão")} · ${m(d.comentarios?._checklist?.nome || "Checklist 5S padrão")}</p></section><div class="progressrow"><span>${r} de ${totalQuestions} itens avaliados</span><div><i style="width:${(r / totalQuestions) * 100}%"></i></div><b>${O(U(d))}</b></div><div class="tabs">${senses.map((s, i) => `<button data-step="${i}" class="${E === i ? "current" : ""}"><small>${X[i]}</small><b>${i + 1}. ${s.name}</b><span>${O(o[i])}</span></button>`).join("")}<button data-step="5" class="${E === 5 ? "current" : ""}"><small>PR\xD3XIMOS PASSOS</small><b>Resumo e a\xE7\xF5es</b><span>\u2192</span></button></div><div id="questions"></div><div class="auditBottom"><span id="saveState">${d._pending ? "Salvo neste aparelho \xB7 envio pendente" : "Salvo no portal"}</span><div>${e ? "" : `<button class="ghost" id="localSave">Salvar no aparelho</button><button class="ghost" id="sync">${g ? "Conectar e enviar ao SuperDB \u2191" : "Enviar ao portal \u2191"}</button>`}${t ? "" : '<button class="primary" id="finish">Concluir auditoria \u2713</button>'}<button class="ghost" id="print">Imprimir / PDF</button></div></div>`),
       (c("#back").onclick = () => {
         ((d = null), w());
       }),
@@ -2715,16 +2693,16 @@
       ),
       E < 5)
     ) {
-      let s = N[E];
+      let s = senses[E];
       ((c("#questions").innerHTML =
-        `<div class="sectionintro"><span class="sensoNum c${E}">0${E + 1}</span><div><h2>${s.name}</h2><p>${X[E]} \xB7 Selecione a nota conforme a condi\xE7\xE3o observada.</p></div></div>` +
+        `<div class="sectionintro"><span class="sensoNum c${E}">0${E + 1}</span><div><h2>${m(s.name)}</h2><p>${X[E]} \xB7 Selecione a nota conforme a condi\xE7\xE3o observada.</p></div></div>` +
         s.items
           .map((i, n) => {
             let l = d.respostas[i.id] || {};
             return `<article class="panel question"><p class="eyebrow">CRIT\xC9RIO ${n + 1} DE ${s.items.length}</p><h3>${m(i.text)}</h3><div class="ratings">${i.criteria.map((f, u) => `<button data-rate="${i.id}" data-value="${u * 25}" ${t || f.trim() === "-" ? "disabled" : ""} class="rating ${l.nota === u * 25 ? "chosen" : ""}"><b>${u * 25}%</b><span>${m(f)}</span></button>`).join("")}</div><label>Observa\xE7\xF5es / evid\xEAncias<textarea data-note="${i.id}" ${t ? "disabled" : ""} placeholder="Descreva o que foi observado nesta avalia\xE7\xE3o\u2026">${m(l.observacao || "")}</textarea></label><div class="photos">${(l.fotos || []).map((f, u) => `<figure><img src="${ee(f)}" alt="Evid\xEAncia da auditoria"><figcaption>Evid\xEAncia ${u + 1}</figcaption>${t ? "" : `<button data-remove-photo="${i.id}" data-photo-index="${u}" class="ghost">Remover</button>`}</figure>`).join("")}${t ? "" : `<button type="button" class="photoupload cameraLaunch" data-camera="${i.id}">\u{1F4F7} Tirar foto</button><label class="photoupload">\uFF0B Escolher arquivo<input type="file" accept="image/*" data-photo="${i.id}" aria-label="Adicionar foto ao crit\xE9rio ${n + 1}"></label>`}</div></article>`;
           })
           .join("") +
-        `<section class="panel"><label>Coment\xE1rios do auditor sobre ${s.name.toLowerCase()}<textarea id="sensoComment" ${t ? "disabled" : ""}>${m(d.comentarios[E] || "")}</textarea></label></section><button class="primary" id="next">${E === 4 ? "Ir para resumo" : "Pr\xF3ximo senso"} \u2192</button>`),
+        `<section class="panel"><label>Coment\xE1rios do auditor sobre ${m(s.name.toLowerCase())}<textarea id="sensoComment" ${t ? "disabled" : ""}>${m(d.comentarios[E] || "")}</textarea></label></section><button class="primary" id="next">${E === 4 ? "Ir para resumo" : "Pr\xF3ximo senso"} \u2192</button>`),
         document.querySelectorAll("[data-rate]").forEach(
           (i) =>
             (i.onclick = () => {
@@ -2840,7 +2818,7 @@
         (c("#finish").onclick = () => {
           if (!d.area.trim() || !d.data_auditoria || !d.auditor.trim())
             return h("Informe \xE1rea, data e auditor.");
-          if (U(d) === null) return h("Avalie os 21 itens antes de concluir.");
+          if (U(d) === null) return h(`Avalie os ${totalQuestions} itens antes de concluir.`);
           d.status = "concluida";
           try {
             (S(),
@@ -3303,16 +3281,113 @@
         v(r);
       }
   }
-  function Ia() {
+  var checklistTemplates = [], checklistOwner = null, checklistStoreReady = false, checklistStoreError = "", checklistDraft = null;
+  function auditSenses(record) {
+    const senses = record?.comentarios?._checklist?.sensos;
+    return Array.isArray(senses) && senses.length === 5 && senses.every((senso) => typeof senso.name === "string" && Array.isArray(senso.items) && senso.items.length && senso.items.every((item) => typeof item.text === "string" && /^[\w-]{1,100}$/.test(item.id) && Array.isArray(item.criteria) && item.criteria.length === 5 && item.criteria.every((text) => typeof text === "string"))) ? senses : N;
+  }
+  function validateChecklist(template) {
+    if (!template.nome?.trim() || template.nome.length > 120 || !template.empresa?.trim() || template.empresa.length > 160) throw Error("Informe o nome do checklist e a empresa.");
+    if (!Array.isArray(template.sensos) || template.sensos.length !== 5) throw Error("O checklist deve ter os cinco sensos.");
+    const ids = new Set();
+    template.sensos.forEach((senso, index) => {
+      if (!Array.isArray(senso.items) || !senso.items.length || senso.items.length > 50) throw Error(`${N[index].name}: mantenha de 1 a 50 perguntas.`);
+      senso.items.forEach((item) => {
+        if (!/^[\w-]{1,100}$/.test(item.id) || ids.has(item.id)) throw Error("Identificador de pergunta inválido ou repetido.");
+        ids.add(item.id);
+        if (!item.text?.trim() || item.text.length > 5000) throw Error("Preencha o texto de cada pergunta (até 5.000 caracteres).");
+        if (!Array.isArray(item.criteria) || item.criteria.length !== 5 || item.criteria.some((text) => typeof text !== "string" || !text.trim() || text.length > 2000)) throw Error("Preencha a classificação de 0%, 25%, 50%, 75% e 100% para cada pergunta. Use - para desabilitar uma nota.");
+        if (item.criteria.every((text) => text.trim() === "-")) throw Error("Cada pergunta precisa ter pelo menos uma nota habilitada.");
+      });
+    });
+    return true;
+  }
+  async function loadChecklistTemplates() {
+    if (!p?.user || !T) return;
+    const owner = p.user.id;
+    if (checklistOwner !== owner) {
+      checklistOwner = owner; checklistTemplates = []; checklistDraft = null; checklistStoreReady = false;
+      try { checklistTemplates = JSON.parse(g ? g.read(`checklists:${owner}`) || "[]" : localStorage.getItem(`programa5s:checklists:${owner}`) || "[]"); } catch {}
+    }
+    if (!navigator.onLine || D) return;
+    try {
+      const result = await b.from("checklists_5s").select("*").order("empresa");
+      if (p?.user?.id !== owner) return;
+      if (result.error) throw result.error;
+      checklistTemplates = (result.data || []).filter((template) => { try { return validateChecklist(template); } catch { return false; } });
+      checklistStoreReady = true; checklistStoreError = "";
+      const json = JSON.stringify(checklistTemplates);
+      try { g ? g.write(`checklists:${owner}`, json) : localStorage.setItem(`programa5s:checklists:${owner}`, json); } catch {}
+    } catch (error) { checklistStoreReady = false; checklistStoreError = error.message || "Banco indisponível"; }
+  }
+  function newAuditFromChecklist(template = null) {
+    const snapshot = template ? { id: template.id, nome: template.nome, empresa: template.empresa, atualizado_em: template.atualizado_em, sensos: template.sensos } : { id: "padrao", nome: "Checklist 5S padrão", empresa: "Padrão", sensos: N };
+    return { id: crypto.randomUUID(), user_id: p.user.id, area: "", data_auditoria: new Date().toLocaleDateString("en-CA"), auditor: p.user.display_name || p.user.email, acompanhantes: "", status: "rascunho", respostas: {}, comentarios: { _checklist: structuredClone(snapshot) }, acoes: [], criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString(), versao_checklist: template ? `empresa:${template.id}:${template.atualizado_em}` : "21.09.2023-aba2" };
+  }
+  async function chooseAuditChecklist() {
+    try {
+      await loadChecklistTemplates();
+      if (!p?.user || !T) return;
+      const start = (template) => { d = newAuditFromChecklist(template); E = 0; C = "auditorias"; w(); };
+      if (!checklistTemplates.length) return start(null);
+      const dialog = document.createElement("dialog"); dialog.className = "cameraDialog";
+      dialog.innerHTML = `<h2>Checklist da auditoria</h2><label>Empresa / checklist<select id="auditChecklistChoice"><option value="">Padrão · Checklist 5S padrão</option>${checklistTemplates.map((template) => `<option value="${m(template.id)}">${m(template.empresa)} · ${m(template.nome)}</option>`).join("")}</select></label><p class="muted">As perguntas e classificações deste modelo serão preservadas nesta auditoria.</p><div class="dashboardHeadActions"><button class="primary" data-start>Iniciar auditoria</button><button class="ghost" data-cancel>Cancelar</button></div>`;
+      const close = () => { dialog.close(); dialog.remove(); };
+      dialog.querySelector("[data-cancel]").onclick = close;
+      dialog.querySelector("[data-start]").onclick = () => { const id = dialog.querySelector("select").value; const template = checklistTemplates.find((row) => row.id === id); close(); start(template || null); };
+      dialog.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
+      document.body.append(dialog); dialog.showModal();
+    } catch (error) { v(error); }
+  }
+  function freshChecklist() {
+    return { id: crypto.randomUUID(), nome: "Avaliação 5S", empresa: "", sensos: structuredClone(N) };
+  }
+  async function Ia() {
     if (T !== "administrador") return h("Configuração disponível somente para administradores.");
-    ((c("#content").innerHTML =
-      Y(
-        "SEU PROGRAMA 5S",
-        "Pronto para ir a campo.",
-        "Instale nos seus aparelhos e configure o portal uma \xFAnica vez.",
-      ) +
-      `<section class="panel"><h2>1. Preparar o banco SuperDB</h2><p>O aplicativo j\xE1 aponta para o projeto <b>p_3634611143</b>. Baixe o SQL, abra o Editor SQL do projeto e execute todo o conte\xFAdo. Ele cria as tabelas e permiss\xF5es com RLS habilitada.</p><a class="primary linkbutton" href="./configuracao-superdb.sql" download>Baixar SQL completo \u2193</a><p><a href="./Permissoes_Administrador_5S.sql" download>Baixar atualização de permissões do administrador</a> · Execute este arquivo no Editor SQL para habilitar a edição e a Lixeira de auditorias dos usuários.</p><p class="muted">No painel de autentica\xE7\xE3o, habilite a confirma\xE7\xE3o de e-mail antes de liberar o uso. O e-mail verificado identifica o administrador principal.</p><p>Depois, crie uma conta no aplicativo com <b>${z}</b>. O login do painel SuperDB \xE9 separado do login deste aplicativo.</p></section><section class="panel"><h2>2. ${g ? "Aplicativo Windows instalado" : "Instalar no PC, tablet ou celular"}</h2>${g ? "<p>O programa abre a partir dos arquivos instalados no computador. Rascunhos e fotos s\xE3o gravados em arquivos protegidos pela sua conta do Windows. Para auditar sem internet, fa\xE7a o primeiro login e valide o banco com internet; nas pr\xF3ximas aberturas, o modo local estar\xE1 dispon\xEDvel. Ao usar Sair, ser\xE1 necess\xE1rio entrar com internet novamente. Nenhum dado \xE9 apagado ao sair.</p>" : ""}<p><b>Windows / Android:</b> abra o endere\xE7o no Chrome ou Edge e use \u201CInstalar aplicativo\u201D no menu do navegador.</p><p><b>iPhone / iPad:</b> abra no Safari, toque em Compartilhar \u2192 Adicionar \xE0 Tela de In\xEDcio.</p><button class="primary" id="installHelp">Instalar neste aparelho \u2197</button><p class="muted">Abra o aplicativo com internet ao menos uma vez antes de usar sem conex\xE3o. A op\xE7\xE3o de instalar depende do navegador e das permiss\xF5es do endere\xE7o hospedado.</p></section><section class="panel"><h2>3. Auditar e enviar os resultados</h2><p>Inicie uma auditoria, preencha o cabe\xE7alho e avalie os 21 crit\xE9rios. Adicione coment\xE1rios e fotos, revise o resumo e conclua. Use <b>Enviar ao portal</b> com internet para confirmar a grava\xE7\xE3o.</p><p>Os rascunhos ficam neste navegador, separados por usu\xE1rio. Eles n\xE3o aparecem nos outros aparelhos at\xE9 o envio. Ao limpar os dados do navegador, os registros locais s\xE3o apagados: exporte um backup ou envie ao portal primeiro.</p><p>O administrador consulta, edita e move qualquer auditoria para a Lixeira, preservando o autor. Cada auditor consulta e altera apenas as suas. Para auditores, auditorias conclu\xEDdas preservam as notas; as a\xE7\xF5es podem ser atualizadas no menu Planos de a\xE7\xE3o.</p></section>`),
-      (c("#installHelp").onclick = Je));
+    await loadChecklistTemplates();
+    if (C !== "ajuda" || T !== "administrador") return;
+    if (!checklistDraft) checklistDraft = freshChecklist();
+    renderChecklistEditor();
+  }
+  function renderChecklistEditor() {
+    if (T !== "administrador" || !checklistDraft) return;
+    const draft = checklistDraft;
+    c("#content").innerHTML = Y("PROGRAMA 5S", "Configuração", "Cadastre os checklists das empresas e a classificação de cada nota.")
+      + (!checklistStoreReady ? `<section class="panel"><h2>Habilitar checklists compartilhados</h2><p>O banco de checklists ainda não está disponível. As alterações só poderão ser publicadas após a ativação.</p><a class="ghost linkbutton" href="./Checklists_Empresas_5S.sql" download>Baixar SQL dos checklists</a><button class="ghost" id="retryChecklists">Verificar novamente</button><p class="muted">${m(checklistStoreError)}</p></section>` : "")
+      + `<section class="panel"><div class="checklistToolbar"><label>Checklist para editar<select id="editChecklist"><option value="">Novo checklist</option>${checklistTemplates.map((row) => `<option value="${m(row.id)}" ${row.id === draft.id ? "selected" : ""}>${m(row.empresa)} · ${m(row.nome)}</option>`).join("")}</select></label><button class="ghost" id="newChecklist">＋ Novo checklist</button><button class="primary" id="saveChecklist" ${checklistStoreReady && navigator.onLine ? "" : "disabled"}>Salvar checklist para a equipe</button></div><div class="formgrid"><label>Empresa<input id="checklistCompany" maxlength="160" value="${m(draft.empresa)}" placeholder="Nome da empresa"></label><label>Nome do checklist<input id="checklistName" maxlength="120" value="${m(draft.nome)}"></label></div><p class="muted">Válido para novas auditorias. Auditorias já iniciadas mantêm o checklist original. Use - na classificação para desabilitar uma nota.</p><p id="checklistMessage" role="status"></p></section>`
+      + draft.sensos.map((senso, index) => `<section class="panel checklistSenso"><div class="paneltitle"><h2>${X[index]} · ${m(N[index].name)}</h2><button class="ghost" data-add-question="${index}">＋ Adicionar pergunta</button></div>${senso.items.map((item, question) => `<article class="checklistQuestion"><div class="paneltitle"><h3>Pergunta ${question + 1}</h3><button class="ghost danger" data-remove-question="${index}:${question}" ${senso.items.length === 1 ? "disabled" : ""}>Excluir pergunta</button></div><label>Pergunta<textarea data-question="${index}:${question}" maxlength="5000">${m(item.text)}</textarea></label><div class="checklistRatings">${item.criteria.map((text, rating) => `<label><b>${rating * 25}%</b> — classificação<textarea data-criterion="${index}:${question}:${rating}" maxlength="2000">${m(text)}</textarea></label>`).join("")}</div></article>`).join("")}</section>`).join("");
+    c("#checklistCompany").oninput = (event) => { draft.empresa = event.target.value; };
+    c("#checklistName").oninput = (event) => { draft.nome = event.target.value; };
+    c("#newChecklist").onclick = () => { if (!confirm("Abrir um novo checklist? Alterações não salvas deste formulário serão descartadas.")) return; checklistDraft = freshChecklist(); renderChecklistEditor(); };
+    c("#editChecklist").onchange = (event) => { if (!confirm("Trocar de checklist? Alterações não salvas deste formulário serão descartadas.")) { renderChecklistEditor(); return; } checklistDraft = structuredClone(checklistTemplates.find((row) => row.id === event.target.value) || freshChecklist()); renderChecklistEditor(); };
+    document.querySelectorAll("[data-question]").forEach((input) => { input.oninput = () => { const [senso, question] = input.dataset.question.split(":").map(Number); draft.sensos[senso].items[question].text = input.value; }; });
+    document.querySelectorAll("[data-criterion]").forEach((input) => { input.oninput = () => { const [senso, question, rating] = input.dataset.criterion.split(":").map(Number); draft.sensos[senso].items[question].criteria[rating] = input.value; }; });
+    document.querySelectorAll("[data-add-question]").forEach((button) => { button.onclick = () => { const senso = draft.sensos[+button.dataset.addQuestion]; if (senso.items.length >= 50) return h("Limite de 50 perguntas por senso."); senso.items.push({ id: crypto.randomUUID(), text: "", criteria: ["", "", "", "", ""] }); renderChecklistEditor(); }; });
+    document.querySelectorAll("[data-remove-question]").forEach((button) => { button.onclick = () => { const [senso, question] = button.dataset.removeQuestion.split(":").map(Number); if (draft.sensos[senso].items.length <= 1) return; if (!confirm("Excluir esta pergunta do modelo? Ela será removida após salvar. Auditorias existentes serão preservadas.")) return; draft.sensos[senso].items.splice(question, 1); renderChecklistEditor(); }; });
+    if (c("#retryChecklists")) c("#retryChecklists").onclick = () => Ia();
+    c("#saveChecklist").onclick = saveChecklistTemplate;
+  }
+  async function saveChecklistTemplate() {
+    if (T !== "administrador" || !checklistDraft || !navigator.onLine) return;
+    const button = c("#saveChecklist"), message = c("#checklistMessage"), draft = structuredClone(checklistDraft);
+    const fields = [...(c("#content").querySelectorAll?.("input, textarea, select, button") || [])].map((field) => [field, field.disabled]);
+    fields.forEach(([field]) => { field.disabled = true; });
+    button.disabled = true;
+    try {
+      validateChecklist(draft);
+      if (!(await ensurePortalSession())) return;
+      const data = { nome: draft.nome.trim(), empresa: draft.empresa.trim(), sensos: draft.sensos.map((senso, index) => ({ name: N[index].name, items: senso.items })), atualizado_em: new Date().toISOString() };
+      const previous = checklistTemplates.find((row) => row.id === draft.id);
+      const query = previous ? b.from("checklists_5s").update(data).eq("id", draft.id).eq("atualizado_em", previous.atualizado_em) : b.from("checklists_5s").insert({ id: draft.id, ...data });
+      const result = await query.select();
+      if (result.error) throw result.error;
+      if (!result.data?.length) throw Error("O checklist não foi salvo. Pode ter sido alterado por outro administrador. Reabra a configuração e confira a versão do portal.");
+      if (p?.user?.id !== checklistOwner || T !== "administrador" || C !== "ajuda" || checklistDraft?.id !== draft.id) return;
+      checklistDraft = structuredClone(result.data[0]);
+      await loadChecklistTemplates(); renderChecklistEditor();
+      c("#checklistMessage").textContent = "Checklist salvo no portal. A equipe poderá selecioná-lo ao iniciar novas auditorias.";
+    } catch (error) { if (message.isConnected !== false) message.textContent = `Não foi possível salvar: ${error.message}`; }
+    finally { fields.forEach(([field, disabled]) => { field.disabled = disabled; }); button.disabled = false; }
   }
   async function Je() {
     if (T !== "administrador") return h("Configuração disponível somente para administradores.");
@@ -3335,11 +3410,12 @@
       setTimeout(() => URL.revokeObjectURL(o), 1e3));
   }
   function Pa() {
+    const senses = auditSenses(d);
     let e = d,
       a = le(e),
       t = document.createElement("div");
     ((t.id = "printReport"),
-      (t.innerHTML = `${W()}<h1>Programa 5S \u2014 Relat\xF3rio de auditoria</h1><p><b>\xC1rea:</b> ${m(e.area)} \xB7 <b>Data:</b> ${m(e.data_auditoria)}<br><b>Auditor:</b> ${m(e.auditor)}<br><b>Acompanhantes:</b> ${m(e.acompanhantes)} \xB7 <b>Status:</b> ${e.status === "concluida" ? "Conclu\xEDda" : "Rascunho"}</p><h2>Resultado: ${O(U(e))}</h2><p>${N.map((r, s) => `${m(r.name)}: ${O(a[s])}`).join(" \xB7 ")}</p>${N.map(
+      (t.innerHTML = `${W()}<h1>Programa 5S \u2014 Relat\xF3rio de auditoria</h1><p><b>\xC1rea:</b> ${m(e.area)} \xB7 <b>Data:</b> ${m(e.data_auditoria)}<br><b>Auditor:</b> ${m(e.auditor)}<br><b>Acompanhantes:</b> ${m(e.acompanhantes)} \xB7 <b>Status:</b> ${e.status === "concluida" ? "Conclu\xEDda" : "Rascunho"}</p><h2>Resultado: ${O(U(e))}</h2><p>${senses.map((r, s) => `${m(r.name)}: ${O(a[s])}`).join(" \xB7 ")}</p>${senses.map(
         (r, s) =>
           `<h2>${X[s]} \u2014 ${m(r.name)} \xB7 ${O(a[s])}</h2>${r.items
             .map((i) => {
@@ -3355,7 +3431,7 @@
             )}<p><b>Coment\xE1rios:</b> ${m(e.comentarios[s] || "")}</p>`,
       ).join(
         "",
-      )}<h2>Coment\xE1rios gerais</h2><p>${m(e.comentarios.geral || "")}</p><h2>Plano de a\xE7\xE3o</h2>${e.acoes.map((r) => `<p><b>${m(r.descricao)}</b> \xB7 ${m(r.responsavel)} \xB7 ${m(r.prazo)} \xB7 ${m(r.status)}</p><div class="printPhotos">${(r.fotos || []).map((s) => `<img src="${ee(s)}" alt="Foto do plano de a\xE7\xE3o">`).join("")}</div>`).join("")}<small>Checklist: Avalia\xE7\xE3o 5S (2), vers\xE3o 21.09.2023. Nota final: m\xE9dia dos cinco sensos.</small>`),
+      )}<h2>Coment\xE1rios gerais</h2><p>${m(e.comentarios.geral || "")}</p><h2>Plano de a\xE7\xE3o</h2>${e.acoes.map((r) => `<p><b>${m(r.descricao)}</b> \xB7 ${m(r.responsavel)} \xB7 ${m(r.prazo)} \xB7 ${m(r.status)}</p><div class="printPhotos">${(r.fotos || []).map((s) => `<img src="${ee(s)}" alt="Foto do plano de a\xE7\xE3o">`).join("")}</div>`).join("")}<small>Checklist: ${m(e.comentarios?._checklist?.nome || "Avaliação 5S (2)")} · ${m(e.comentarios?._checklist?.empresa || "Padrão")} · ${m(e.versao_checklist || "21.09.2023-aba2")}. Nota final: m\xE9dia dos cinco sensos.</small>`),
       document.body.append(t));
     let o = () => {
       (t.remove(), window.removeEventListener("afterprint", o));
