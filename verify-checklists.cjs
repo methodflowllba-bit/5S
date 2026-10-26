@@ -1,0 +1,40 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+let PGlite;try{({PGlite}=require('@electric-sql/pglite'))}catch{({PGlite}=require('../qa-db/node_modules/@electric-sql/pglite'))}
+const source=fs.readFileSync('app.js','utf8');
+function extract(name){const points=[...source.matchAll(/^  (?:async )?function ([\w$]+)\(/gm)],i=points.findIndex(p=>p[1]===name);return source.slice(points[i].index,points[i+1].index)}
+const ctx={structuredClone,crypto:require('node:crypto').webcrypto,p:{user:{id:'10000000-0000-4000-8000-000000000001',email:'admin@example.com'}},T:'administrador'};
+vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('  var N = ['),source.indexOf('  function createWebAuthStorage')),ctx);
+vm.runInContext(['auditSenses','validateChecklist','freshChecklist','newAuditFromChecklist','le','U'].map(extract).join('\n'),ctx);
+(async()=>{
+ const template=ctx.freshChecklist();template.empresa='Empresa A';ctx.validateChecklist(template);
+ template.sensos[0].items=[{id:'question-A',text:'Bancada organizada?',criteria:['Nenhum padrão','Poucos itens','Metade','Quase todos','Todos os itens no local']}];
+ const audit=ctx.newAuditFromChecklist(template);assert.equal(ctx.auditSenses(audit)[0].items.length,1);assert.equal(audit.comentarios._checklist.empresa,'Empresa A');
+ audit.comentarios._checklist.sensos.forEach(s=>s.items.forEach(item=>{audit.respostas[item.id]={nota:75}}));assert.equal(ctx.U(audit),75);
+ template.sensos[0].items[0].text='Texto alterado posteriormente';template.sensos[0].items.push({id:'new',text:'Outra pergunta',criteria:['0','25','50','75','100']});assert.equal(ctx.auditSenses(audit)[0].items.length,1);assert.equal(ctx.auditSenses(audit)[0].items[0].text,'Bancada organizada?');assert.equal(ctx.U(audit),75);
+ const legacy={respostas:{}};ctx.N.forEach(s=>s.items.forEach(item=>{legacy.respostas[item.id]={nota:50}}));assert.equal(ctx.U(legacy),50);assert.equal(ctx.auditSenses(legacy),ctx.N);
+ const invalid=structuredClone(template);invalid.sensos[1].items=[];assert.throws(()=>ctx.validateChecklist(invalid),/1 a 50/);invalid.sensos[1].items=structuredClone(template.sensos[1].items);invalid.sensos[0].items[0].criteria=['0'];assert.throws(()=>ctx.validateChecklist(invalid),/classificação/);
+ const nodes=new Map(),controls=new Map();ctx.C='ajuda';ctx.checklistDraft=structuredClone(template);ctx.checklistTemplates=[];ctx.checklistStoreReady=true;ctx.checklistOwner=ctx.p.user.id;ctx.navigator={onLine:true};ctx.X=['SEIRI','SEITON','SEISO','SEIKETSU','SHITSUKE'];ctx.confirm=()=>true;ctx.Y=()=>'';ctx.m=s=>String(s??'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');ctx.h=()=>{};
+ ctx.c=key=>{if(!nodes.has(key))nodes.set(key,{});return nodes.get(key)};
+ ctx.document={querySelectorAll:selector=>{let list=[];if(selector==='[data-add-question]')list=ctx.checklistDraft.sensos.map((_,i)=>({dataset:{addQuestion:String(i)}}));if(selector==='[data-remove-question]')list=ctx.checklistDraft.sensos.flatMap((s,i)=>s.items.map((_,j)=>({dataset:{removeQuestion:i+':'+j}})));if(selector==='[data-question]')list=ctx.checklistDraft.sensos.flatMap((s,i)=>s.items.map((item,j)=>({value:item.text,dataset:{question:i+':'+j}})));if(selector==='[data-criterion]')list=ctx.checklistDraft.sensos.flatMap((s,i)=>s.items.flatMap((item,j)=>item.criteria.map((value,k)=>({value,dataset:{criterion:i+':'+j+':'+k}}))));controls.set(selector,list);return list}};
+ ctx.ensurePortalSession=async()=>true;ctx.b={from:()=>({insert:()=>({select:async()=>{ctx.writes=(ctx.writes||0)+1;return{error:{message:'RLS recusou'}}}})})};
+ vm.runInContext(['renderChecklistEditor','saveChecklistTemplate'].map(extract).join('\n'),ctx);ctx.renderChecklistEditor();assert.match(nodes.get('#content').innerHTML,/0%/);assert.match(nodes.get('#content').innerHTML,/100%/);assert.ok(!nodes.get('#content').innerHTML.includes('Preparar o banco SuperDB'));
+ const before=ctx.checklistDraft.sensos[0].items.length;controls.get('[data-add-question]')[0].onclick();assert.equal(ctx.checklistDraft.sensos[0].items.length,before+1);controls.get('[data-remove-question]').find(x=>x.dataset.removeQuestion==='0:'+before).onclick();assert.equal(ctx.checklistDraft.sensos[0].items.length,before);
+ const classification=controls.get('[data-criterion]').find(x=>x.dataset.criterion==='0:0:4');classification.value='Todos os itens identificados';classification.oninput();assert.equal(ctx.checklistDraft.sensos[0].items[0].criteria[4],'Todos os itens identificados');
+ await ctx.saveChecklistTemplate();assert.equal(ctx.writes,1);assert.match(nodes.get('#checklistMessage').textContent,/RLS recusou/);assert.equal(ctx.checklistDraft.sensos[0].items[0].criteria[4],'Todos os itens identificados');ctx.T='usuario';await ctx.saveChecklistTemplate();assert.equal(ctx.writes,1);ctx.T='administrador';
+ const db=new PGlite(),schema='proj_p_3634611143',uid='10000000-0000-4000-8000-000000000001';
+ await db.exec(`create role anon;create role authenticated;create schema auth;create schema ${schema};grant usage on schema auth,${schema} to authenticated,anon;
+ create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.uid',true),'')::uuid$$;
+ create function ${schema}.membro_5s() returns boolean language sql stable as $$select current_setting('test.member',true)='yes'$$;
+ create function ${schema}.admin_5s() returns boolean language sql stable as $$select current_setting('test.admin',true)='yes'$$;
+ create function ${schema}.sessao_5s_ativa() returns boolean language sql stable as $$select current_setting('test.session',true)='yes'$$;`);
+ const sql=fs.readFileSync('Checklists_Empresas_5S.sql','utf8');await db.exec(sql);await db.exec(sql);
+ await db.query("select set_config('test.uid',$1,false),set_config('test.member','yes',false),set_config('test.admin','yes',false),set_config('test.session','yes',false)",[uid]);await db.exec(`set role authenticated;set search_path to ${schema},public`);
+ await db.query('insert into checklists_5s(nome,empresa,sensos) values($1,$2,$3)',[template.nome,template.empresa,JSON.stringify(template.sensos)]);
+ await db.query("select set_config('test.admin','no',false)");assert.equal((await db.query('select * from checklists_5s')).rows.length,1);
+ await assert.rejects(()=>db.query('insert into checklists_5s(nome,empresa,sensos) values($1,$2,$3)',['Indevido','B',JSON.stringify(template.sensos)]),/row-level security/);
+ assert.equal((await db.query("update checklists_5s set nome='Inválido' returning id")).rows.length,0);
+ await db.query("select set_config('test.session','no',false)");assert.equal((await db.query('select * from checklists_5s')).rows.length,0);
+ await db.exec('reset role;set role anon');await assert.rejects(()=>db.query(`select * from ${schema}.checklists_5s`),/permission denied/);
+ await db.close();
+ console.log('Aprovado: checklist por empresa, classificação das cinco notas, inclusão/exclusão sem recalcular histórico, pontuação variável, compatibilidade com 21 itens antigos, SQL reexecutável e RLS de leitura/edição/sessão/anon.');
+})().catch(error=>{console.error(error);process.exitCode=1});
