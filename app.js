@@ -2168,7 +2168,7 @@
         .join("")
         .toUpperCase(),
     W = () =>
-      '<div class="brand"><img src="./logo.svg" alt="Method Flow"><div><b>Programa <span>5S</span></b><small>METHOD FLOW \xB7 MELHORIA CONT\xCDNUA</small></div></div>';
+      `<div class="brand">${validBrandLogo(portalBrandLogo) ? `<img class="companyLogo" src="${portalBrandLogo}" alt="Logotipo escolhido pelo administrador">` : ""}<div><b>Programa <span>5S</span></b><small>MELHORIA CONTÍNUA</small></div></div>`;
   function w() {
     if ((C === "ajuda" || C === "usuarios") && T !== "administrador") C = "inicio";
     if (!p) {
@@ -2177,7 +2177,7 @@
     }
     if (
       ((c("#app").innerHTML =
-        `<aside>${W()}<div class="navlabel">ESPA\xC7O DE TRABALHO</div><nav>${[["inicio", "\u25EB", "Vis\xE3o geral"], ["dashboard", "◈", "Dashboard"], ["auditorias", "\u2611", "Auditorias"], ["acoes", "\u2197", "Planos de a\xE7\xE3o"], ...(T === "administrador" ? [["usuarios", "\u2659", "Usu\xE1rios"], ["ajuda", "⚙", "Configuração"]] : [])].map(([e, a, t]) => `<button data-nav="${e}" class="${C === e ? "selected" : ""}"><span>${a}</span>${t}</button>`).join("")}</nav><div class="asidefoot"><span class="avatar">${m(ka(p.user.email || "MF"))}</span><div><b>${m((p.user.email || "").split("@")[0])}</b><small>${T === "administrador" ? "Administrador" : T === "usuario" ? "Auditor" : "Acesso pendente"}</small></div><button id="logout" title="Sair" aria-label="Sair">\u21AA</button></div></aside><main><header><span>GEST\xC3O DO AMBIENTE DE TRABALHO</span><div><span class="connection ${navigator.onLine ? "" : "offline"}">\u25CF ${D ? "Modo local" : navigator.onLine ? "Online" : "Sem internet"}</span><button class="ghost" id="logoutTop">Sair da conta</button>${T === "administrador" ? `<button class="ghost" id="installTop">${g ? "Vers\xE3o instalada \u2713" : "Instalar app \u2197"}</button>` : ""}</div></header><div id="content"></div><footer>Programa 5S \xB7 Method Flow <span>Organiza\xE7\xE3o que transforma resultados.</span></footer></main>`),
+        `<aside>${W()}<div class="navlabel">ESPA\xC7O DE TRABALHO</div><nav>${[["inicio", "\u25EB", "Vis\xE3o geral"], ["dashboard", "◈", "Dashboard"], ["auditorias", "\u2611", "Auditorias"], ["acoes", "\u2197", "Planos de a\xE7\xE3o"], ...(T === "administrador" ? [["usuarios", "\u2659", "Usu\xE1rios"], ["ajuda", "⚙", "Configuração"]] : [])].map(([e, a, t]) => `<button data-nav="${e}" class="${C === e ? "selected" : ""}"><span>${a}</span>${t}</button>`).join("")}</nav><div class="asidefoot"><span class="avatar">${m(ka(p.user.email || "MF"))}</span><div><b>${m((p.user.email || "").split("@")[0])}</b><small>${T === "administrador" ? "Administrador" : T === "usuario" ? "Auditor" : "Acesso pendente"}</small></div><button id="logout" title="Sair" aria-label="Sair">\u21AA</button></div></aside><main><header><span>GEST\xC3O DO AMBIENTE DE TRABALHO</span><div><span class="connection ${navigator.onLine ? "" : "offline"}">\u25CF ${D ? "Modo local" : navigator.onLine ? "Online" : "Sem internet"}</span><button class="ghost" id="logoutTop">Sair da conta</button>${T === "administrador" ? `<button class="ghost" id="installTop">${g ? "Vers\xE3o instalada \u2713" : "Instalar app \u2197"}</button>` : ""}</div></header><div id="content"></div><footer>${methodFlowFooter()}</footer></main>`),
       document.querySelectorAll("[data-nav]").forEach(
         (e) =>
           (e.onclick = () => {
@@ -2429,6 +2429,7 @@
       if (!(await ensurePortalSession())) return;
       if (M().some((row) => row._trashPending && canManageAudit(row))) await Me();
       if (p?.user?.id !== account) return;
+      await loadPortalBranding();
       await ue(false);
       if (!d && C !== "ajuda") w();
     } catch {
@@ -2540,7 +2541,7 @@
     document.querySelector("#printReport")?.remove();
     const report = document.createElement("div");
     report.id = "printReport"; report.className = "dashboardPrint";
-    report.innerHTML = `${W()}<h1>Dashboard — Programa 5S</h1><p><b>Área / setor:</b> ${m(filters.area || "Todas as áreas")}<br><b>Período:</b> ${dashboardDate(filters.from)} até ${dashboardDate(filters.to)} (datas inclusivas)<br><b>Emitido em:</b> ${m(new Date().toLocaleString("pt-BR"))}<br><b>Responsável pela emissão:</b> ${m(p.user.email || "")}</p>${dashboardResults(model)}<p>Programa 5S · Method Flow · method-flow.com</p>`;
+    report.innerHTML = `${W()}<h1>Dashboard — Programa 5S</h1><p><b>Área / setor:</b> ${m(filters.area || "Todas as áreas")}<br><b>Período:</b> ${dashboardDate(filters.from)} até ${dashboardDate(filters.to)} (datas inclusivas)<br><b>Emitido em:</b> ${m(new Date().toLocaleString("pt-BR"))}<br><b>Responsável pela emissão:</b> ${m(p.user.email || "")}</p>${dashboardResults(model)}${methodFlowFooter()}`;
     document.body.append(report);
     const cleanup = () => { report.remove(); window.removeEventListener("afterprint", cleanup); };
     window.addEventListener("afterprint", cleanup);
@@ -3101,7 +3102,7 @@
     report.innerHTML = `${W()}<h1>Programa 5S — Planos de ação</h1><p><b>Área / setor:</b> ${m(filters.area || "Todas as áreas")}<br><b>Período das auditorias:</b> ${dashboardDate(filters.from)} até ${dashboardDate(filters.to)}<br><b>Status das ações:</b> ${filters.status === "concluida" ? "Concluídas" : filters.status === "aberta" ? "Abertas" : "Todos"}<br><b>Emitido em:</b> ${m(new Date().toLocaleString("pt-BR"))}<br><b>Responsável pela emissão:</b> ${m(p.user.email || "")}</p><p>${rows.length} ação(ões) em ${grouped.size} auditoria(s) · ${rows.filter((row) => row.status === "concluida").length} concluída(s) · ${rows.filter((row) => row.status !== "concluida").length} aberta(s).</p>${[...grouped.values()].map((actions) => {
       const audit = actions[0].audit;
       return `<section class="actionAuditPrint"><h2>${m(dashboardArea(audit))} · ${dashboardDate(audit.data_auditoria)}</h2><p><b>Auditor:</b> ${m(audit.auditor || "Não informado")} · <b>Auditoria:</b> ${audit.status === "concluida" ? "Concluída" : "Rascunho"}${audit._pending ? " · Envio pendente ao portal" : ""}</p>${actions.map((action) => `<article class="actionCardPrint"><h3>Ação ${action.index + 1} — ${m(action.descricao || "Sem descrição")}</h3><div class="actionMetaPrint"><p><b>Responsável:</b> ${m(action.responsavel || "Não informado")}</p><p><b>Prazo:</b> ${action.prazo ? m(dashboardDate(action.prazo)) : "Não informado"}</p><p><b>Status:</b> ${action.status === "concluida" ? "Concluída" : "Aberta"}</p></div>${action.fotos?.length ? `<div class="printPhotos">${action.fotos.map((photo, index) => `<figure><img src="${ee(photo)}" alt="Foto ${index + 1} da ação ${action.index + 1}"><figcaption>Evidência ${index + 1}</figcaption></figure>`).join("")}</div>` : ""}</article>`).join("")}</section>`;
-    }).join("")}<p>Programa 5S · Method Flow · method-flow.com</p>`;
+    }).join("")}${methodFlowFooter()}`;
     document.querySelector("#printReport")?.remove();
     document.body.append(report);
     const cleanup = () => { report.remove(); window.removeEventListener("afterprint", cleanup); };
@@ -3301,7 +3302,85 @@
     });
     return true;
   }
+  var portalBrandLogo = "", brandOwner = null, brandDraft = null, brandDraftVersion = null, brandVersion = null, brandReady = false, brandError = "";
+  function validBrandLogo(value) {
+    return typeof value === "string" && value.length <= 350000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
+  }
+  function methodFlowFooter() {
+    return '<div class="methodFlowFooter"><span>Programa 5S · Tecnologia Method Flow</span><img src="./logo.svg" alt="Method Flow"></div>';
+  }
+  async function loadPortalBranding() {
+    if (!p?.user || !T) return;
+    const owner = p.user.id;
+    if (brandOwner !== owner) {
+      brandOwner = owner; portalBrandLogo = ""; brandDraft = null; brandDraftVersion = null; brandVersion = null; brandReady = false; brandError = "";
+      try { const value = g ? g.read(`branding:${owner}`) : localStorage.getItem(`programa5s:branding:${owner}`); if (validBrandLogo(value)) portalBrandLogo = value; } catch {}
+    }
+    if (!navigator.onLine || D) return;
+    try {
+      const result = await b.from("identidade_5s").select("*").eq("id", "00000000-0000-4000-8000-000000000005");
+      if (p?.user?.id !== owner) return;
+      if (result.error) throw result.error;
+      const row = result.data?.[0];
+      portalBrandLogo = validBrandLogo(row?.logotipo) ? row.logotipo : "";
+      brandVersion = row?.atualizado_em || null; brandReady = true; brandError = "";
+      try { g ? g.write(`branding:${owner}`, portalBrandLogo) : localStorage.setItem(`programa5s:branding:${owner}`, portalBrandLogo); } catch {}
+    } catch (error) { brandReady = false; brandError = error.message || "Banco indisponível"; }
+  }
+  function brandingEditor() {
+    if (T !== "administrador") return "";
+    const logo = brandDraft === null ? portalBrandLogo : brandDraft;
+    return `<section class="panel"><h2>Logotipo do portal e dos relatórios</h2><p>Escolha a marca que aparecerá no cabeçalho das auditorias, Dashboard e planos de ação, inclusive na impressão e no PDF. O Method Flow ficará no rodapé.</p><div class="logoPreview" id="logoPreview">${validBrandLogo(logo) ? `<img src="${logo}" alt="Prévia do logotipo">` : '<span>Sem logotipo no cabeçalho</span>'}</div><div class="dashboardHeadActions"><label class="ghost linkbutton">Adicionar ou trocar logotipo<input id="brandFile" type="file" accept="image/png,image/jpeg,image/webp"></label><button id="removeBrand" class="ghost danger">Remover logotipo</button><button id="saveBrand" class="primary" ${brandReady && navigator.onLine ? "" : "disabled"}>Salvar logotipo para a equipe</button></div><p class="muted">PNG, JPG ou WebP, até 5 MB. A imagem será ajustada para uso nos relatórios. Para confirmar uma remoção, clique em Salvar logotipo.</p><p id="brandMessage" role="status">${brandReady ? "" : m("Não foi possível carregar a configuração: " + brandError)}</p></section>`;
+  }
+  async function prepareBrandLogo(file) {
+    if (!file || !["image/png", "image/jpeg", "image/webp"].includes(file.type)) throw Error("Selecione uma imagem PNG, JPG ou WebP.");
+    if (file.size > 5 * 1024 * 1024) throw Error("A imagem deve ter até 5 MB.");
+    const image = await createImageBitmap(file);
+    try {
+      if (!image.width || !image.height || image.width * image.height > 24000000) throw Error("A imagem é muito grande. Reduza para até 24 megapixels.");
+      const scale = Math.min(1, 600 / image.width, 300 / image.height), canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale)); canvas.height = Math.max(1, Math.round(image.height * scale));
+      canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+      const data = canvas.toDataURL("image/png");
+      if (!validBrandLogo(data)) throw Error("Imagem muito detalhada. Use um arquivo menor ou com fundo simples.");
+      return data;
+    } finally { image.close(); }
+  }
+  function bindBrandingEditor() {
+    if (T !== "administrador") return;
+    c("#brandFile").onchange = async (event) => {
+      const file = event.target.files?.[0], owner = p?.user?.id;
+      if (!file) return;
+      try { const logo = await prepareBrandLogo(file); if (p?.user?.id !== owner || T !== "administrador" || C !== "ajuda") return; if (brandDraft === null) brandDraftVersion = brandVersion; brandDraft = logo; renderChecklistEditor(); c("#brandMessage").textContent = "Prévia pronta. Clique em Salvar logotipo para a equipe."; }
+      catch (error) { if (p?.user?.id === owner && C === "ajuda") c("#brandMessage").textContent = error.message; }
+    };
+    c("#removeBrand").onclick = () => { if (brandDraft === null) brandDraftVersion = brandVersion; brandDraft = ""; renderChecklistEditor(); c("#brandMessage").textContent = "Remoção preparada. Clique em Salvar logotipo para confirmar."; };
+    c("#saveBrand").onclick = savePortalBranding;
+  }
+  async function savePortalBranding() {
+    if (T !== "administrador" || !brandReady || !navigator.onLine) return;
+    const owner = p?.user?.id, logo = brandDraft === null ? portalBrandLogo : brandDraft;
+    if (logo !== "" && !validBrandLogo(logo)) return h("Logotipo inválido.");
+    const fields = [...c("#content").querySelectorAll("input, textarea, select, button")].map(field => [field, field.disabled]);
+    fields.forEach(([field]) => { field.disabled = true; });
+    try {
+      if (!(await ensurePortalSession())) return;
+      const data = { logotipo: logo, atualizado_em: new Date().toISOString() }, id = "00000000-0000-4000-8000-000000000005";
+      const version = brandDraft === null ? brandVersion : brandDraftVersion;
+      const query = version ? b.from("identidade_5s").update(data).eq("id", id).eq("atualizado_em", version) : b.from("identidade_5s").insert({ id, ...data });
+      const result = await query.select();
+      if (result.error) throw result.error;
+      if (!result.data?.length) throw Error("Outro administrador alterou o logotipo. Atualize a página e selecione a imagem novamente.");
+      if (p?.user?.id !== owner || T !== "administrador") return;
+      portalBrandLogo = logo; brandVersion = result.data[0].atualizado_em; brandDraft = null; brandDraftVersion = null;
+      try { g ? g.write(`branding:${owner}`, logo) : localStorage.setItem(`programa5s:branding:${owner}`, logo); } catch {}
+      if (C === "ajuda") { renderChecklistEditor(); c("#brandMessage").textContent = logo ? "Logotipo salvo para a equipe e relatórios." : "Logotipo removido do cabeçalho e dos relatórios."; }
+      document.querySelectorAll("aside > .brand").forEach(node => { node.outerHTML = W(); });
+    } catch (error) { if (C === "ajuda") c("#brandMessage").textContent = `Não foi possível salvar: ${error.message}`; }
+    finally { fields.forEach(([field, disabled]) => { field.disabled = disabled; }); }
+  }
   async function loadChecklistTemplates() {
+    await loadPortalBranding();
     if (!p?.user || !T) return;
     const owner = p.user.id;
     if (checklistOwner !== owner) {
@@ -3352,6 +3431,7 @@
     if (T !== "administrador" || !checklistDraft) return;
     const draft = checklistDraft;
     c("#content").innerHTML = Y("PROGRAMA 5S", "Configuração", "Cadastre os checklists das empresas e a classificação de cada nota.")
+      + brandingEditor()
       + (!checklistStoreReady ? `<section class="panel"><h2>Habilitar checklists compartilhados</h2><p>O banco de checklists ainda não está disponível. As alterações só poderão ser publicadas após a ativação.</p><a class="ghost linkbutton" href="./Checklists_Empresas_5S.sql" download>Baixar SQL dos checklists</a><button class="ghost" id="retryChecklists">Verificar novamente</button><p class="muted">${m(checklistStoreError)}</p></section>` : "")
       + `<section class="panel"><div class="checklistToolbar"><label>Checklist para editar<select id="editChecklist"><option value="">Novo checklist</option>${checklistTemplates.map((row) => `<option value="${m(row.id)}" ${row.id === draft.id ? "selected" : ""}>${m(row.empresa)} · ${m(row.nome)}</option>`).join("")}</select></label><button class="ghost" id="newChecklist">＋ Novo checklist</button><button class="primary" id="saveChecklist" ${checklistStoreReady && navigator.onLine ? "" : "disabled"}>Salvar checklist para a equipe</button></div><div class="formgrid"><label>Empresa<input id="checklistCompany" maxlength="160" value="${m(draft.empresa)}" placeholder="Nome da empresa"></label><label>Nome do checklist<input id="checklistName" maxlength="120" value="${m(draft.nome)}"></label></div><p class="muted">Válido para novas auditorias. Auditorias já iniciadas mantêm o checklist original. Use - na classificação para desabilitar uma nota.</p><p id="checklistMessage" role="status"></p></section>`
       + draft.sensos.map((senso, index) => `<section class="panel checklistSenso"><div class="paneltitle"><h2>${X[index]} · ${m(N[index].name)}</h2><button class="ghost" data-add-question="${index}">＋ Adicionar pergunta</button></div>${senso.items.map((item, question) => `<article class="checklistQuestion"><div class="paneltitle"><h3>Pergunta ${question + 1}</h3><button class="ghost danger" data-remove-question="${index}:${question}" ${senso.items.length === 1 ? "disabled" : ""}>Excluir pergunta</button></div><label>Pergunta<textarea data-question="${index}:${question}" maxlength="5000">${m(item.text)}</textarea></label><div class="checklistRatings">${item.criteria.map((text, rating) => `<label><b>${rating * 25}%</b> — classificação<textarea data-criterion="${index}:${question}:${rating}" maxlength="2000">${m(text)}</textarea></label>`).join("")}</div></article>`).join("")}</section>`).join("");
@@ -3365,6 +3445,7 @@
     document.querySelectorAll("[data-remove-question]").forEach((button) => { button.onclick = () => { const [senso, question] = button.dataset.removeQuestion.split(":").map(Number); if (draft.sensos[senso].items.length <= 1) return; if (!confirm("Excluir esta pergunta do modelo? Ela será removida após salvar. Auditorias existentes serão preservadas.")) return; draft.sensos[senso].items.splice(question, 1); renderChecklistEditor(); }; });
     if (c("#retryChecklists")) c("#retryChecklists").onclick = () => Ia();
     c("#saveChecklist").onclick = saveChecklistTemplate;
+    bindBrandingEditor();
   }
   async function saveChecklistTemplate() {
     if (T !== "administrador" || !checklistDraft || !navigator.onLine) return;
@@ -3430,7 +3511,7 @@
             )}<p><b>Coment\xE1rios:</b> ${m(e.comentarios[s] || "")}</p>`,
       ).join(
         "",
-      )}<h2>Coment\xE1rios gerais</h2><p>${m(e.comentarios.geral || "")}</p><h2>Plano de a\xE7\xE3o</h2>${e.acoes.map((r) => `<p><b>${m(r.descricao)}</b> \xB7 ${m(r.responsavel)} \xB7 ${m(r.prazo)} \xB7 ${m(r.status)}</p><div class="printPhotos">${(r.fotos || []).map((s) => `<img src="${ee(s)}" alt="Foto do plano de a\xE7\xE3o">`).join("")}</div>`).join("")}<small>Checklist: ${m(e.comentarios?._checklist?.nome || "Avaliação 5S (2)")} · ${m(e.comentarios?._checklist?.empresa || "Padrão")} · ${m(e.versao_checklist || "21.09.2023-aba2")}. Nota final: m\xE9dia dos cinco sensos.</small>`),
+      )}<h2>Coment\xE1rios gerais</h2><p>${m(e.comentarios.geral || "")}</p><h2>Plano de a\xE7\xE3o</h2>${e.acoes.map((r) => `<p><b>${m(r.descricao)}</b> \xB7 ${m(r.responsavel)} \xB7 ${m(r.prazo)} \xB7 ${m(r.status)}</p><div class="printPhotos">${(r.fotos || []).map((s) => `<img src="${ee(s)}" alt="Foto do plano de a\xE7\xE3o">`).join("")}</div>`).join("")}<small>Checklist: ${m(e.comentarios?._checklist?.nome || "Avaliação 5S (2)")} · ${m(e.comentarios?._checklist?.empresa || "Padrão")} · ${m(e.versao_checklist || "21.09.2023-aba2")}. Nota final: m\xE9dia dos cinco sensos.</small>${methodFlowFooter()}`),
       document.body.append(t));
     let o = () => {
       (t.remove(), window.removeEventListener("afterprint", o));
