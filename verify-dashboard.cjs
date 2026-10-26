@@ -15,7 +15,7 @@ const ctx = { console, Set, Number, Math, Date, p:{user:{id:'admin',email:'admin
   document:{querySelector:()=>null,body:{append:report=>{ctx.report=report}},createElement:()=>({querySelectorAll:()=>[],remove(){ctx.removed=true}})} };
 vm.createContext(ctx);
 vm.runInContext(source.slice(source.indexOf('  var N = ['),source.indexOf('  function createWebAuthStorage')),ctx);
-vm.runInContext(['ke','le','U','canManageAudit','I','dashboardArea','dashboardDate','dashboardModel','dashboardRadar','dashboardResults','showDashboard','printDashboard'].map(extract).join('\n'),ctx);
+vm.runInContext(['ke','auditSenses','le','U','canManageAudit','I','dashboardArea','dashboardDate','dashboardModel','dashboardRadar','dashboardResults','showDashboard','printDashboard'].map(extract).join('\n'),ctx);
 ctx.$=row=>row.comentarios?._lixeira?.excluida===true;
 function audit(id,area,date,values,extra={}) {
  const respostas={};ctx.N.forEach((s,i)=>s.items.forEach(item=>{respostas[item.id]={nota:values[i]}}));
