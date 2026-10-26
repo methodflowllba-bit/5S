@@ -9,7 +9,7 @@ const ctx={p:{user:{id:'auditor',email:'auditor@example.com'}},T:'usuario',ne:[]
  c:key=>{if(!nodes.has(key))nodes.set(key,{value:'',innerHTML:''});return nodes.get(key)},Y:()=>'',W:()=>'<div>Programa 5S · Method Flow</div>',h:msg=>ctx.message=msg,
  document:{querySelectorAll:()=>[],querySelector:()=>null,body:{append:report=>ctx.report=report},createElement:()=>({querySelectorAll:()=>[photo],remove:()=>ctx.removed=true})},
  window:{addEventListener:(event,fn)=>events.set(event,fn),removeEventListener:event=>events.delete(event),print:()=>ctx.printed=true}};
-vm.createContext(ctx);vm.runInContext(['ke','canManageAudit','I','ee','dashboardArea','dashboardDate','actionReportRows','Ca','printActionPlans'].map(extract).join('\n'),ctx);ctx.$=row=>row.comentarios?._lixeira?.excluida===true;
+vm.createContext(ctx);vm.runInContext(['methodFlowFooter','ke','canManageAudit','I','ee','dashboardArea','dashboardDate','actionReportRows','Ca','printActionPlans'].map(extract).join('\n'),ctx);ctx.$=row=>row.comentarios?._lixeira?.excluida===true;
 const a={id:'A',user_id:'auditor',area:'Montagem',auditor:'Maria',data_auditoria:'2026-10-01',status:'concluida',_pending:true,acoes:[{descricao:'Organizar bancada',responsavel:'João',prazo:'2026-10-30',status:'aberta',fotos:['data:image/jpeg;base64,/9j/2Q==']},{descricao:'Concluída fora do filtro',responsavel:'Ana',status:'concluida'}]};
 const b={...a,id:'B',area:'Logística',data_auditoria:'2026-10-22',acoes:[{descricao:'Separar materiais',status:'aberta'}]};
 const filters={area:'Montagem',from:'2026-10-01',to:'2026-10-22',status:'aberta'};
