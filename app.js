@@ -2415,7 +2415,6 @@
   let refreshingSharedAudits = false;
   async function refreshSharedAudits() {
     if (passwordSetupInProgress) return;
-    if (C === "ajuda") return;
     if (!p || R || refreshingSharedAudits || !navigator.onLine || document.visibilityState === "hidden") return;
     refreshingSharedAudits = true;
     const account = p.user.id;
@@ -2431,7 +2430,7 @@
       if (M().some((row) => row._trashPending && canManageAudit(row))) await Me();
       if (p?.user?.id !== account) return;
       await ue(false);
-      if (!d) w();
+      if (!d && C !== "ajuda") w();
     } catch {
       // Keep the last confirmed state and retry on the next connection/refresh.
     } finally {
