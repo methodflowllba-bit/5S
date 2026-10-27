@@ -13,7 +13,7 @@ const deleted = {...base, comentarios:{_lixeira:{excluida:true,em:'2026-10-18T16
     ctx.$ = x => x.comentarios?._lixeira?.excluida === true;
     ctx.M = () => ctx.local; ctx.ce = x => ctx.local = x;
     ctx.b = {from:()=>({select:()=>({order:async()=>({data:[structuredClone(deleted)]})})})};
-    ctx.ensurePortalSession=async()=>true;vm.createContext(ctx); vm.runInContext(extract('ke') + extract('ue'), ctx);
+    ctx.readAllAuditPages=async(table,columns)=>table==='auditorias_5s'?ctx.b.from(table).select(columns).order():{data:[]};ctx.ensurePortalSession=async()=>true;vm.createContext(ctx); vm.runInContext(extract('ke') + extract('ue'), ctx);
     await ctx.ue(false);
     assert.equal(ctx.local[0].comentarios._lixeira.excluida,true);
     assert.equal(ctx.local[0].respostas.foto,'preservada');
