@@ -16,7 +16,7 @@ const ctx = { console, Set, Number, Math, Date, p:{user:{id:'admin',email:'admin
 vm.createContext(ctx);
 vm.runInContext(source.slice(source.indexOf('  var N = ['),source.indexOf('  function createWebAuthStorage')),ctx);
 ctx.portalBrandLogo='';
-vm.runInContext(['validBrandLogo','methodFlowFooter','ke','auditSenses','le','U','canManageAudit','I','dashboardArea','dashboardDate','dashboardModel','dashboardRadar','dashboardResults','showDashboard','printDashboard'].map(extract).join('\n'),ctx);
+vm.runInContext(['validBrandLogo','methodFlowFooter','ke','auditSenses','le','U','canManageAudit','I','dashboardArea','dashboardDate','dashboardModel','dashboardRadar','dashboardGrouping','dashboardValidDate','dashboardPeriod','dashboardGroups','dashboardEvolution','dashboardGroupBars','dashboardPeriodResults','dashboardResults','showDashboard','printDashboard'].map(extract).join('\n'),ctx);
 ctx.$=row=>row.comentarios?._lixeira?.excluida===true;
 function audit(id,area,date,values,extra={}) {
  const respostas={};ctx.N.forEach((s,i)=>s.items.forEach(item=>{respostas[item.id]={nota:values[i]}}));
@@ -32,6 +32,18 @@ const incomplete=audit('incomplete','Montagem','2026-10-10',[100,100,100,100,100
 const rows=[a,b,outside,other,draft,trash,incomplete], filters={area:'Montagem',from:'2026-10-01',to:'2026-10-22'};
 (async()=>{
  const model=ctx.dashboardModel(rows,filters);
+ assert.equal(ctx.dashboardPeriod('2026-02-30','day'),null);
+ assert.equal(ctx.dashboardPeriod('2026-01-01','week').key,'2025-12-29');
+ assert.equal(ctx.dashboardPeriod('2026-10-25','week').key,'2026-10-19');
+ const grouped=ctx.dashboardGroups(ctx.dashboardModel([a,b,outside,other],{}),'month');
+ assert.equal(grouped.periods.length,2);assert.equal(grouped.periods[0].label,'Set/2026');assert.equal(grouped.periods[0].count,1);assert.equal(grouped.periods[0].average,100);assert.equal(grouped.periods[1].count,3);assert.ok(Math.abs(grouped.periods[1].average-125/3)<1e-10);
+ assert.equal(grouped.areas.length,2);assert.ok(Math.abs(grouped.areas.find(x=>x.label==='Montagem').average-200/3)<1e-10);
+ assert.equal(ctx.dashboardGroups(model,'day').periods.length,2);assert.equal(ctx.dashboardGroups(model,'year').periods.length,1);assert.equal(ctx.dashboardGroups(model,'week').periods.length,2);
+ vm.runInContext(extract('readAllAuditPages'),ctx);const history=Array.from({length:1234},(_,i)=>({id:String(i)}));let calls=0;
+ ctx.b={from:()=>({select:()=>({order:()=>({range:async(from,to)=>{calls++;return{data:history.slice(from,to+1)}}})})})};const full=await ctx.readAllAuditPages('auditorias_5s');assert.equal(full.data.length,1234);assert.equal(calls,7);
+ ctx.b={from:()=>({select:()=>({order:()=>({range:async()=>({error:{message:'Sessão encerrada'}})})})})};assert.equal((await ctx.readAllAuditPages('auditorias_5s')).error.message,'Sessão encerrada');
+ const invalidDate=audit('bad-date','Montagem','2026-02-30',[100,100,100,100,100]);assert.equal(ctx.dashboardModel([invalidDate],{}).rows.length,0);
+ const many=Array.from({length:30},(_,i)=>audit('many'+i,'Montagem',`${2024+Math.floor(i/12)}-${String(i%12+1).padStart(2,'0')}-01`,[50,50,50,50,50]));const timeline=ctx.dashboardEvolution(ctx.dashboardGroups(ctx.dashboardModel(many,{}),'month').periods);assert.equal((timeline.match(/<svg/g)||[]).length,3);assert.ok(timeline.includes('Jun/2026'));assert.ok(!/NaN|undefined/.test(timeline));
  assert.deepEqual(Array.from(model.rows,item=>item.row.id),['start','end']);
  assert.deepEqual(Array.from(model.scores),[50,50,50,50,50]);assert.equal(model.average,50);assert.equal(model.areas,1);assert.equal(model.pending,1);assert.equal(model.excluded,1);
  const zero=ctx.dashboardModel([audit('zero','Montagem','2026-10-22',[0,0,0,0,0])],filters);assert.equal(zero.average,0);assert.ok(ctx.dashboardRadar(zero.scores).includes('0%'));
@@ -42,6 +54,7 @@ const rows=[a,b,outside,other,draft,trash,incomplete], filters={area:'Montagem',
  ctx.T='administrador';ctx.p.user.id='admin';
  ctx.showDashboard();c('#dashboardArea').value='Montagem';c('#dashboardFrom').value='2026-10-01';c('#dashboardTo').value='2026-10-22';c('#dashboardFrom').onchange();
  assert.match(c('#dashboardSummary').textContent,/01\/10\/2026.*22\/10\/2026/);assert.equal(c('#printDashboard').disabled,false);assert.match(c('#dashboardResults').innerHTML,/50%/);
+ c('#dashboardGrouping').value='week';c('#dashboardGrouping').onchange();assert.equal(ctx.dashboardFilters.groupBy,'week');assert.match(c('#dashboardResults').innerHTML,/Semana 19\/10\/2026/);
  ctx.showDashboard();assert.equal(ctx.dashboardFilters.area,'Montagem','Atualização conserva o filtro');
  await ctx.printDashboard(model,filters);await Promise.resolve();assert.equal(ctx.printed,true);
  assert.match(ctx.report.innerHTML,/01\/10\/2026.*22\/10\/2026/);assert.match(ctx.report.innerHTML,/<svg/);assert.ok(!ctx.report.innerHTML.includes('30/09/2026'));assert.ok(!ctx.report.innerHTML.includes('Logística'));assert.match(ctx.report.innerHTML,/Envio pendente/);
