@@ -2373,6 +2373,17 @@
         ));
     }
   }
+  async function readAllAuditPages(table, columns = "*") {
+    const rows = new Map(), size = 200;
+    for (let offset = 0; ; offset += size) {
+      const result = await b.from(table).select(columns).order("id").range(offset, offset + size - 1);
+      if (result.error) return { data: null, error: result.error };
+      const page = result.data || [], before = rows.size;
+      page.forEach(row => rows.set(row.id, row));
+      if (page.length < size) return { data: [...rows.values()], error: null };
+      if (rows.size === before) return { data: null, error: Error("Não foi possível carregar todo o histórico. Atualize o portal novamente.") };
+    }
+  }
   async function ue(e = !0) {
     const account = p?.user?.id;
     if (!(await ensurePortalSession())) return;
@@ -2380,13 +2391,10 @@
       return h(
         "Abra uma auditoria e use Enviar ao SuperDB para validar sua conex\xE3o e sess\xE3o.",
       );
-    let a = await b
-      .from("auditorias_5s")
-      .select("*")
-      .order("data_auditoria", { ascending: !1 });
+    let a = await readAllAuditPages("auditorias_5s");
     if (a.error) throw a.error;
     // A minimal deletion ledger invalidates stale copies on every device.
-    const purged = await b.from("auditorias_excluidas_5s").select("id");
+    const purged = await readAllAuditPages("auditorias_excluidas_5s", "id");
     if (!account || p?.user?.id !== account) return;
     const removedIds = new Set(purged.error ? [] : (purged.data || []).map((row) => row.id));
     if (removedIds.size) {
@@ -2394,7 +2402,7 @@
       if (d && removedIds.has(d.id)) { d = null; w(); h("Esta auditoria foi excluída definitivamente no portal."); }
       removedIds.forEach((id) => selectedTrashAudits.delete(id));
     }
-    ne = (a.data || []).filter((row) => !removedIds.has(row.id));
+    ne = (a.data || []).filter((row) => !removedIds.has(row.id)).sort((a,b) => String(b.data_auditoria).localeCompare(String(a.data_auditoria)) || a.id.localeCompare(b.id));
     // Persist the server's deletion/restoration marker in this device's cache.
     // Keep a newer offline request until it has been acknowledged by the server.
     const remote = new Map(ne.map((row) => [row.id, row]));
@@ -2474,7 +2482,7 @@
         ((C = "auditorias"), w());
       }));
   }
-  var dashboardFilters = { owner: null, area: "", from: "", to: "" };
+  var dashboardFilters = { owner: null, area: "", from: "", to: "", groupBy: "month" };
   function dashboardArea(row) {
     return String(row.area || "").trim() || "Área não informada";
   }
@@ -2488,7 +2496,7 @@
       && (!filters.from || row.data_auditoria >= filters.from)
       && (!filters.to || row.data_auditoria <= filters.to));
     const evaluated = filtered.map((row) => ({ row, scores: le(row) }));
-    const rows = evaluated.filter(({ scores }) => scores.length === 5 && scores.every((value) => Number.isFinite(value) && value >= 0 && value <= 100));
+    const rows = evaluated.filter(({ row, scores }) => dashboardValidDate(row.data_auditoria) && scores.length === 5 && scores.every((value) => Number.isFinite(value) && value >= 0 && value <= 100));
     const scores = N.map((_, index) => rows.length ? rows.reduce((sum, item) => sum + item.scores[index], 0) / rows.length : null);
     return { rows, scores, excluded: filtered.length - rows.length,
       average: rows.length ? scores.reduce((sum, value) => sum + value, 0) / 5 : null,
@@ -2509,29 +2517,84 @@
       return `<circle cx="${dot[0]}" cy="${dot[1]}" r="4.5" fill="#0757b6"><title>${m(senso.name)}: ${O(scores[index])}</title></circle><text x="${label[0]}" y="${label[1]}" text-anchor="${anchor}" class="radarLabel">${m(senso.name)}<tspan x="${label[0]}" dy="19" class="radarScore">${O(scores[index])}</tspan></text>`;
     }).join("")}</svg>`;
   }
-  function dashboardResults(model) {
+  function dashboardGrouping(value) {
+    return ["day", "week", "month", "year"].includes(value) ? value : "month";
+  }
+  function dashboardValidDate(value) {
+    return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value + "T00:00:00Z")) && new Date(value + "T00:00:00Z").toISOString().slice(0, 10) === value;
+  }
+  function dashboardPeriod(value, grouping) {
+    if (!dashboardValidDate(value)) return null;
+    const group = dashboardGrouping(grouping), date = new Date(value + "T00:00:00Z");
+    if (group === "year") return { key: value.slice(0, 4), label: value.slice(0, 4) };
+    if (group === "month") return { key: value.slice(0, 7), label: ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][date.getUTCMonth()] + "/" + value.slice(0, 4) };
+    if (group === "week") {
+      date.setUTCDate(date.getUTCDate() - (date.getUTCDay() + 6) % 7);
+      const key = date.toISOString().slice(0, 10);
+      return { key, label: "Semana " + dashboardDate(key) };
+    }
+    return { key: value, label: dashboardDate(value) };
+  }
+  function dashboardGroups(model, grouping) {
+    const periods = new Map(), areas = new Map();
+    const add = (map, key, label, item) => {
+      if (!map.has(key)) map.set(key, { key, label, count: 0, sums: [0,0,0,0,0] });
+      const group = map.get(key); group.count++;
+      item.scores.forEach((score, index) => { group.sums[index] += score; });
+    };
+    (model.rows || []).forEach(item => {
+      const period = dashboardPeriod(item.row.data_auditoria, grouping);
+      if (!period) return;
+      add(periods, period.key, period.label, item);
+      const area = dashboardArea(item.row); add(areas, area, area, item);
+    });
+    const finish = group => ({ key: group.key, label: group.label, count: group.count, scores: group.sums.map(sum => sum / group.count), average: group.sums.reduce((sum, value) => sum + value, 0) / group.count / 5 });
+    return { periods: [...periods.values()].sort((a,b) => a.key.localeCompare(b.key)).map(finish), areas: [...areas.values()].sort((a,b) => a.label.localeCompare(b.label, "pt-BR")).map(finish) };
+  }
+  function dashboardEvolution(periods) {
+    const colors = ["#0757b6","#0c8570","#b27600","#a34291","#db4b25","#26364a"];
+    const labels = [...X, "Nota geral"];
+    const legend = `<div class="evolutionLegend">${labels.map((label,index)=>`<span><i style="background:${colors[index]}"></i>${m(label)}</span>`).join("")}</div>`;
+    const charts = [];
+    for (let start = 0; start < periods.length; start += 12) {
+      const rows = periods.slice(start, start + 12), x = index => rows.length === 1 ? 480 : 60 + index * 840 / (rows.length - 1), y = score => 255 - score * 2.1;
+      charts.push(`<div class="periodChart"><svg viewBox="0 0 960 340" role="img" aria-label="Evolução de ${m(rows[0].label)} a ${m(rows.at(-1).label)}"><title>Médias dos cinco sensos e nota geral por período; escala de 0 a 100%.</title>${[0,25,50,75,100].map(score=>`<line x1="50" x2="915" y1="${y(score)}" y2="${y(score)}" stroke="#dbe4ef"/><text x="40" y="${y(score)+4}" text-anchor="end" class="periodAxis">${score}%</text>`).join("")}${labels.map((label,series)=>`<polyline points="${rows.map((row,index)=>`${x(index)},${y(series===5?row.average:row.scores[series])}`).join(" ")}" fill="none" stroke="${colors[series]}" stroke-width="${series===5?4:2}" ${series===5?'stroke-dasharray="7 4"':""}/>${rows.map((row,index)=>{const score=series===5?row.average:row.scores[series];return `<circle cx="${x(index)}" cy="${y(score)}" r="${series===5?5:3}" fill="${colors[series]}"><title>${m(row.label)} · ${m(label)}: ${O(score)} · ${row.count} auditoria(s)</title></circle>`;}).join("")}`).join("")}${rows.map((row,index)=>`<text x="${x(index)}" y="285" text-anchor="middle" class="periodAxis">${m(row.label.replace("Semana ", ""))}<tspan x="${x(index)}" dy="19">${row.count} aud.</tspan></text>`).join("")}</svg></div>`);
+    }
+    return legend + charts.join("");
+  }
+  function dashboardGroupBars(rows, count = false) {
+    const maximum = count ? Math.max(1, ...rows.map(row => row.count)) : 100;
+    return `<div class="periodBars">${rows.map((row,index)=>`<div class="periodBarRow"><div><b>${m(row.label)}</b><small>${row.count} auditoria(s)</small></div><div class="periodBarTrack"><span style="width:${(count?row.count:row.average)/maximum*100}%;background:${["#0757b6","#0c8570","#b27600","#a34291","#db4b25"][index%5]}"></span></div><strong>${count?row.count:O(row.average)}</strong></div>`).join("")}</div>`;
+  }
+  function dashboardPeriodResults(model, grouping) {
+    const groups = dashboardGroups(model, grouping);
+    if (!groups.periods.length) return "";
+    return `<section class="panel periodPanel"><h2>Evolução dos cinco sensos e da nota geral</h2>${dashboardEvolution(groups.periods)}<p class="muted">Média das auditorias de cada período. Só aparecem períodos com auditorias; intervalos sem avaliação não representam nota zero. Semanas começam na segunda-feira. Cada auditoria tem o mesmo peso.</p></section><div class="periodComparison"><section class="panel periodPanel"><h2>Resultado por área no período selecionado</h2>${dashboardGroupBars(groups.areas)}<p class="muted">Nota geral de cada área, de 0 a 100%.</p></section><section class="panel periodPanel"><h2>Quantidade de auditorias por período</h2>${dashboardGroupBars(groups.periods,true)}</section></div><section class="panel periodPanel"><h2>Resumo por período</h2><div class="tablewrap"><table><thead><tr><th>PERÍODO</th><th>AUDITORIAS</th>${X.map(name=>`<th>${m(name)}</th>`).join("")}<th>NOTA GERAL</th></tr></thead><tbody>${groups.periods.map(row=>`<tr><td>${m(row.label)}</td><td>${row.count}</td>${row.scores.map(score=>`<td>${O(score)}</td>`).join("")}<td><b>${O(row.average)}</b></td></tr>`).join("")}</tbody></table></div></section>`;
+  }
+  function dashboardResults(model, filters = {}) {
     if (model.error) return `<div class="empty" role="alert"><p>${m(model.error)}</p></div>`;
-    const warning = model.excluded ? `<p class="dashboardWarning">${model.excluded} auditoria(s) concluída(s) com notas incompletas ou inválidas foram desconsideradas.</p>` : "";
+    const warning = model.excluded ? `<p class="dashboardWarning">${model.excluded} auditoria(s) concluída(s) com data ou notas incompletas ou inválidas foram desconsideradas.</p>` : "";
     if (!model.rows.length) return `${warning}<div class="empty"><h3>Nenhuma auditoria concluída com pontuação neste filtro</h3><p>Altere a área ou o período para consultar outros resultados.</p></div>`;
-    return `${warning}<div class="metrics dashboardMetrics"><article><span>AUDITORIAS CONCLUÍDAS</span><strong>${model.rows.length}</strong><small>Consideradas no gráfico</small></article><article><span>RESULTADO MÉDIO</span><strong>${O(model.average)}</strong><small>Mesmo peso para os cinco sensos</small></article><article><span>ÁREAS AVALIADAS</span><strong>${model.areas}</strong><small>No período selecionado</small></article><article><span>ENVIO PENDENTE</span><strong>${model.pending}</strong><small>Incluídas a partir deste aparelho</small></article></div><div class="dashboardGrid"><section class="panel dashboardChart"><div class="paneltitle"><h2>Radar dos cinco sensos</h2><span class="pill">Escala 0 a 100%</span></div>${dashboardRadar(model.scores)}<p class="muted">Média das auditorias selecionadas. Cada auditoria tem o mesmo peso.</p></section><section class="panel"><h2>Pontuação por senso</h2><div class="dashboardSenses">${N.map((senso, index) => `<div><span class="sensoNum c${index}">0${index + 1}</span><div><b>${m(senso.name)}</b><small>${X[index]}</small></div><strong>${O(model.scores[index])}</strong></div>`).join("")}</div><p class="muted">A nota de cada senso segue o cálculo do checklist: média dos seus critérios. A nota final é a média dos cinco sensos.</p></section></div><section class="panel dashboardAudits"><h2>Auditorias consideradas</h2><div class="tablewrap"><table><thead><tr><th>DATA</th><th>ÁREA / AUDITOR</th>${X.map((name) => `<th>${name}</th>`).join("")}<th>FINAL</th></tr></thead><tbody>${model.rows.map(({ row, scores }) => `<tr><td>${m(dashboardDate(row.data_auditoria))}</td><td><b>${m(dashboardArea(row))}</b><small>${m(row.auditor || "")}${row._pending ? " · Envio pendente" : ""}</small></td>${scores.map((score) => `<td>${O(score)}</td>`).join("")}<td><b>${O(scores.reduce((sum, score) => sum + score, 0) / 5)}</b></td></tr>`).join("")}</tbody></table></div></section>`;
+    return `${warning}<div class="metrics dashboardMetrics"><article><span>AUDITORIAS CONCLUÍDAS</span><strong>${model.rows.length}</strong><small>Consideradas no gráfico</small></article><article><span>RESULTADO MÉDIO</span><strong>${O(model.average)}</strong><small>Mesmo peso para os cinco sensos</small></article><article><span>ÁREAS AVALIADAS</span><strong>${model.areas}</strong><small>No período selecionado</small></article><article><span>ENVIO PENDENTE</span><strong>${model.pending}</strong><small>Incluídas a partir deste aparelho</small></article></div><div class="dashboardGrid"><section class="panel dashboardChart"><div class="paneltitle"><h2>Radar dos cinco sensos</h2><span class="pill">Escala 0 a 100%</span></div>${dashboardRadar(model.scores)}<p class="muted">Média das auditorias selecionadas. Cada auditoria tem o mesmo peso.</p></section><section class="panel"><h2>Pontuação por senso</h2><div class="dashboardSenses">${N.map((senso, index) => `<div><span class="sensoNum c${index}">0${index + 1}</span><div><b>${m(senso.name)}</b><small>${X[index]}</small></div><strong>${O(model.scores[index])}</strong></div>`).join("")}</div><p class="muted">A nota de cada senso segue o cálculo do checklist: média dos seus critérios. A nota final é a média dos cinco sensos.</p></section></div>${dashboardPeriodResults(model, filters.groupBy)}<section class="panel dashboardAudits"><h2>Auditorias consideradas</h2><div class="tablewrap"><table><thead><tr><th>DATA</th><th>ÁREA / AUDITOR</th>${X.map((name) => `<th>${name}</th>`).join("")}<th>FINAL</th></tr></thead><tbody>${model.rows.map(({ row, scores }) => `<tr><td>${m(dashboardDate(row.data_auditoria))}</td><td><b>${m(dashboardArea(row))}</b><small>${m(row.auditor || "")}${row._pending ? " · Envio pendente" : ""}</small></td>${scores.map((score) => `<td>${O(score)}</td>`).join("")}<td><b>${O(scores.reduce((sum, score) => sum + score, 0) / 5)}</b></td></tr>`).join("")}</tbody></table></div></section>`;
   }
   function showDashboard() {
-    if (dashboardFilters.owner !== p.user.id) dashboardFilters = { owner: p.user.id, area: "", from: "", to: "" };
+    if (dashboardFilters.owner !== p.user.id) dashboardFilters = { owner: p.user.id, area: "", from: "", to: "", groupBy: "month" };
     const records = I(), areas = [...new Set(records.map(dashboardArea))].sort((a, b) => a.localeCompare(b, "pt-BR"));
     if (dashboardFilters.area && !areas.includes(dashboardFilters.area)) areas.push(dashboardFilters.area);
     c("#content").innerHTML = Y("ANÁLISE DOS RESULTADOS", "Dashboard", "Acompanhe a pontuação dos cinco sensos por área e período.", '<button class="primary" id="printDashboard">Imprimir / Salvar PDF</button>')
-      + `<section class="panel"><div class="dashboardFilters"><label>Área / setor<select id="dashboardArea"><option value="">Todas as áreas</option>${areas.map((area) => `<option value="${m(area)}" ${dashboardFilters.area === area ? "selected" : ""}>${m(area)}</option>`).join("")}</select></label><label>Data inicial<input id="dashboardFrom" type="date" value="${m(dashboardFilters.from)}"></label><label>Data final<input id="dashboardTo" type="date" value="${m(dashboardFilters.to)}"></label><button class="ghost" id="clearDashboard">Limpar filtros</button><button class="ghost" id="refreshDashboard">↻ Atualizar portal</button></div><p class="muted">Filtra pela data da auditoria, incluindo o primeiro e o último dia. Sem datas, considera todo o histórico. Rascunhos e auditorias na lixeira não entram no cálculo.</p></section><p id="dashboardSummary" class="dashboardSummary" role="status"></p><div id="dashboardResults"></div>`;
+      + `<section class="panel"><div class="dashboardFilters"><label>Área / setor<select id="dashboardArea"><option value="">Todas as áreas</option>${areas.map((area) => `<option value="${m(area)}" ${dashboardFilters.area === area ? "selected" : ""}>${m(area)}</option>`).join("")}</select></label><label>Data inicial<input id="dashboardFrom" type="date" value="${m(dashboardFilters.from)}"></label><label>Data final<input id="dashboardTo" type="date" value="${m(dashboardFilters.to)}"></label><label>Agrupar por<select id="dashboardGrouping">${[["day","Dia"],["week","Semana"],["month","Mês"],["year","Ano"]].map(([value,label])=>`<option value="${value}" ${dashboardGrouping(dashboardFilters.groupBy)===value?"selected":""}>${label}</option>`).join("")}</select></label><button class="ghost" id="clearDashboard">Limpar filtros</button><button class="ghost" id="refreshDashboard">↻ Atualizar portal</button></div><p class="muted">Filtra pela data da auditoria, incluindo o primeiro e o último dia. Sem datas, considera todo o histórico. Rascunhos e auditorias na lixeira não entram no cálculo.</p></section><p id="dashboardSummary" class="dashboardSummary" role="status"></p><div id="dashboardResults"></div>`;
     const update = () => {
       dashboardFilters.area = c("#dashboardArea").value;
       dashboardFilters.from = c("#dashboardFrom").value;
       dashboardFilters.to = c("#dashboardTo").value;
+      dashboardFilters.groupBy = dashboardGrouping(c("#dashboardGrouping").value);
       const model = dashboardModel(I(), dashboardFilters);
       c("#dashboardSummary").textContent = `${dashboardFilters.area || "Todas as áreas"} · De ${dashboardDate(dashboardFilters.from)} até ${dashboardDate(dashboardFilters.to)}`;
-      c("#dashboardResults").innerHTML = dashboardResults(model);
+      c("#dashboardResults").innerHTML = dashboardResults(model, dashboardFilters);
       c("#printDashboard").disabled = !!model.error || !model.rows.length;
     };
-    ["#dashboardArea", "#dashboardFrom", "#dashboardTo"].forEach((id) => { c(id).onchange = update; });
-    c("#clearDashboard").onclick = () => { ["#dashboardArea", "#dashboardFrom", "#dashboardTo"].forEach((id) => { c(id).value = ""; }); update(); };
+    ["#dashboardArea", "#dashboardFrom", "#dashboardTo", "#dashboardGrouping"].forEach((id) => { c(id).onchange = update; });
+    c("#clearDashboard").onclick = () => { ["#dashboardArea", "#dashboardFrom", "#dashboardTo"].forEach((id) => { c(id).value = ""; }); c("#dashboardGrouping").value = "month"; update(); };
     c("#refreshDashboard").onclick = () => ue().catch(v);
     c("#printDashboard").onclick = () => printDashboard(dashboardModel(I(), dashboardFilters), { ...dashboardFilters });
     update();
@@ -2541,7 +2604,7 @@
     document.querySelector("#printReport")?.remove();
     const report = document.createElement("div");
     report.id = "printReport"; report.className = "dashboardPrint";
-    report.innerHTML = `${W()}<h1>Dashboard — Programa 5S</h1><p><b>Área / setor:</b> ${m(filters.area || "Todas as áreas")}<br><b>Período:</b> ${dashboardDate(filters.from)} até ${dashboardDate(filters.to)} (datas inclusivas)<br><b>Emitido em:</b> ${m(new Date().toLocaleString("pt-BR"))}<br><b>Responsável pela emissão:</b> ${m(p.user.email || "")}</p>${dashboardResults(model)}${methodFlowFooter()}`;
+    report.innerHTML = `${W()}<h1>Dashboard — Programa 5S</h1><p><b>Área / setor:</b> ${m(filters.area || "Todas as áreas")}<br><b>Período:</b> ${dashboardDate(filters.from)} até ${dashboardDate(filters.to)} (datas inclusivas)<br><b>Agrupamento:</b> ${m({day:"Dia",week:"Semana",month:"Mês",year:"Ano"}[dashboardGrouping(filters.groupBy)])}<br><b>Emitido em:</b> ${m(new Date().toLocaleString("pt-BR"))}<br><b>Responsável pela emissão:</b> ${m(p.user.email || "")}</p>${dashboardResults(model, filters)}${methodFlowFooter()}`;
     document.body.append(report);
     const cleanup = () => { report.remove(); window.removeEventListener("afterprint", cleanup); };
     window.addEventListener("afterprint", cleanup);
