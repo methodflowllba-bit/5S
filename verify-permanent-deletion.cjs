@@ -15,6 +15,7 @@ function setup({deny=false,cancel=false,pending=false,role='administrador'}={}){
  // Purges from the server invalidate pending cached copies and open editors.
  const ctx=setup();ctx.d=structuredClone(audit);ctx.ze=()=>{throw Error('Não pode salvar novamente uma auditoria apagada')};
  ctx.b.from=table=>({select:()=>table==='auditorias_excluidas_5s'?Promise.resolve({data:[{id:'a'}]}):{order:async()=>({data:[]})}});
+ ctx.readAllAuditPages=async table=>table==='auditorias_excluidas_5s'?{data:[{id:'a'}]}:{data:[]};
  vm.runInContext(extract('ue'),ctx);await ctx.ue(false);assert.equal(ctx.rows.length,0);assert.equal(ctx.d,null);
  const sql=fs.readFileSync('Exclusao_Definitiva_5S.sql','utf8');assert.match(sql,/enable row level security/);assert.match(sql,/for delete to authenticated/);assert.match(sql,/comentarios->'_lixeira'->>'excluida'='true'/);assert.match(sql,/user_id=auth.uid\(\) or proj_p_3634611143.admin_5s\(\)/);assert.match(sql,/after delete/);assert.match(sql,/before insert or update/);assert.ok(!/disable row level security|service_role/i.test(sql));
  console.log('Aprovado: exclusão selecionada, confirmação, falha RLS sem perda local, bloqueio offline/pendente e remoção de cópias antigas após sincronização.');
